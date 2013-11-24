@@ -165,23 +165,7 @@ for (;;) {
     next if check_register($log_text, $register);
 
     # in classifer mode figure out the classifier where applicable.
-    my ($cl_char, $cl_pinyin, $rest);
-    if ($classifier_mode) {
-        if ($english =~ /CL:/) {
-            $classifier = $english;
-            $classifier =~ s/^.*CL:(.).*$/$1/;
-            $hid_cl =~ s/,? *CL:[^ ]+ / /g;  # one Chinese char matched by /.../
-            open FILE, "<$wordlist";
-            while (<FILE>) {
-                if (/^$classifier\|/) {
-                    chomp;
-                    ($cl_char, $cl_pinyin, $rest) = split /\|/;
-                    last;
-                }
-            }
-            close FILE;
-        }
-    }
+    my ($cl_char, $cl_pinyin, $rest) = $classifier_mode ? get_classifier($english, $hid_cl) : (undef, undef, undef);
     
     # start timer.
     my ($ssec, $smil) = gettimeofday();
@@ -405,6 +389,26 @@ sub list_words {
     }
     close FILE;
     exit;
+}
+
+sub get_classifier {
+    my ($english, $hid_cl) = @_;
+    my ($cl_char, $cl_pinyin, $rest);
+    if ($english =~ /CL:/) {
+        $classifier = $english;
+        $classifier =~ s/^.*CL:(.).*$/$1/;
+        $hid_cl =~ s/,? *CL:[^ ]+ / /g;  # one Chinese char matched by /.../
+        open FILE, "<$wordlist";
+        while (<FILE>) {
+    	if (/^$classifier\|/) {
+    	    chomp;
+    	    ($cl_char, $cl_pinyin, $rest) = split /\|/;
+    	    last;
+    	}
+        }
+        close FILE;
+    }
+    return ($cl_char, $cl_pinyin, $rest);
 }
 
 sub elapsed {
