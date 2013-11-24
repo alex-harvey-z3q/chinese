@@ -13,6 +13,7 @@ use Getopt::Long qw(:config no_ignore_case);
 my $logfile = 'chinese.log';
 my $wordlist = 'chinese';
 my $register = 'chinese.reg';
+my $characters = 'characters';
 my $character_register = 'chinese_char.reg';
 my $classifier_register = 'chinese_class.reg';
 my $threshold = 5;
@@ -400,13 +401,15 @@ sub get_classifier {
 }
 
 sub get_response {
-    my ($chars, $pinyin, $hid_cl, $hist_str, $mes, $chinese_mode, $english_mode, $coin_toss) = @_;
+    my ($chars, $pinyin, $hid_cl, $hist_str, $mes,
+        $chinese_mode, $english_mode, $coin_toss) = @_;
     my ($response, $resp_piny, $resp_engl);
     if ($character_mode) {
         print "$chars $hist_str $mes\n";
         print 'ANSWER> ';
         $response = <STDIN>;
         ($resp_piny, $resp_engl) = break_up_response($response, $pinyin);
+        lookup_chars($chars);
         print "$pinyin $hid_cl";
     } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
         print "$chars $pinyin $hist_str $mes\n";
@@ -418,6 +421,16 @@ sub get_response {
         print 'ANSWER> ';
         $response = <STDIN>;
         print "$chars $pinyin";
+    }
+}
+
+sub lookup_chars {
+    my $chars = shift;
+    my @chars = split '', $chars;
+    foreach my $c (@chars) {
+        print "$c:\n";
+        system("grep \"^ +[0-9][0-9]* $c\" $characters |sed -e 's/^/  /' |grep --color=auto $c");
+        print "\n";
     }
 }
 
