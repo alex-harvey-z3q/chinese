@@ -165,31 +165,19 @@ for (;;) {
     next if check_register($log_text, $register);
 
     # in classifer mode figure out the classifier where applicable.
-    my ($cl_char, $cl_pinyin, $rest) = $classifier_mode ? get_classifier($english, $hid_cl) : (undef, undef, undef);
+    my ($cl_char, $cl_pinyin, $rest) = $classifier_mode ?
+        get_classifier($english, $hid_cl) : (undef, undef, undef);
     
     # start timer.
     my ($ssec, $smil) = gettimeofday();
 
-    # now, either print a Chinese or an English word.
-    my ($response, $resp_piny, $resp_engl);
+    # coin toss.
     my $coin_toss = int(rand(2));
-    if ($character_mode) {
-        print "$chars $hist_str $mes\n";
-        print 'ANSWER> ';
-        $response = <STDIN>;
-        ($resp_piny, $resp_engl) = break_up_response($response, $pinyin);
-        print "$pinyin $hid_cl";
-    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
-        print "$chars $pinyin $hist_str $mes\n";
-        print 'ANSWER> ';
-        $response = <STDIN>;
-        print "$hid_cl";
-    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
-        print "$hid_cl $hist_str $mes\n";
-        print 'ANSWER> ';
-        $response = <STDIN>;
-        print "$chars $pinyin";
-    }
+
+    # now, either print a Chinese or an English word and get response.
+    my ($response, $resp_piny, $resp_engl) =
+        get_response($chars, $pinyin, $hid_cl, $hist_str, $mes,
+            $chinese_mode, $english_mode, $coin_toss);
 
     # also add section unless we're in section mode.
     if (defined $section) {
@@ -409,6 +397,28 @@ sub get_classifier {
         close FILE;
     }
     return ($cl_char, $cl_pinyin, $rest);
+}
+
+sub get_response {
+    my ($chars, $pinyin, $hid_cl, $hist_str, $mes, $chinese_mode, $english_mode, $coin_toss) = @_;
+    my ($response, $resp_piny, $resp_engl);
+    if ($character_mode) {
+        print "$chars $hist_str $mes\n";
+        print 'ANSWER> ';
+        $response = <STDIN>;
+        ($resp_piny, $resp_engl) = break_up_response($response, $pinyin);
+        print "$pinyin $hid_cl";
+    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
+        print "$chars $pinyin $hist_str $mes\n";
+        print 'ANSWER> ';
+        $response = <STDIN>;
+        print "$hid_cl";
+    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
+        print "$hid_cl $hist_str $mes\n";
+        print 'ANSWER> ';
+        $response = <STDIN>;
+        print "$chars $pinyin";
+    }
 }
 
 sub elapsed {
