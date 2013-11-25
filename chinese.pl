@@ -229,6 +229,166 @@ for (;;) {
 
 on_exit();
 
+##
+## subroutines
+##
+
+sub am_correct {
+    my ($coin_toss, $response, $resp_piny, $pinyin, $resp_engl, $english,
+        $honesty_mode, $character_mode, $chinese_mode, $english_mode) = @_;
+    my $am_correct;
+    if ($honesty_mode) {
+        print "correct? (y/n) ";
+        my $input = <STDIN>;
+        $am_correct = 1 if $input =~ /^y/i;
+    } elsif ($character_mode) {
+        $am_correct =
+            pinyin_compare($resp_piny, $pinyin) &&
+            pinyin_compare($resp_engl, $english);
+    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
+        $am_correct = pinyin_compare($response, $english);
+    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
+        $am_correct = pinyin_compare($response, $pinyin);
+    }
+    return $am_correct;
+}
+
+sub break_up_response {
+    my ($response, $pinyin) = @_;
+    chomp $response;
+    $response =~ s/^ *//;
+    $response =~ s/ *$//;
+    $response =~ s/ +/ /g;
+    my ($resp_piny, $resp_engl);
+    # (\w|')+ - allow for words like qin'ai
+    if ($pinyin =~ /^(\w|')+ (\w|')+$/) {
+        ($resp_piny, $resp_engl) = ($response =~ /^((\w|')+ (\w|')+) (.*)$/);
+    } elsif ($pinyin =~ /^(\w|')+ (\w|')+ (\w|')+$/) {
+        ($resp_piny, $resp_engl) = ($response =~ /^((\w|')+ (\w|')+ (\w|')+) (.*)$/);
+    } elsif ($pinyin =~ /^(\w|')+ (\w|')+ (\w|')+ (\w|')+$/) {
+        ($resp_piny, $resp_engl) = ($response =~ /^((\w|')+ (\w|')+ (\w|')+ (\w|')+) (.*)$/);
+    } else {
+        if ($response =~ / /) {
+            ($resp_piny, $resp_engl) = ($response =~ /^((?:\w|')+) (.*)$/);
+        } else {
+            $resp_piny = $response;
+            if ($resp_piny) {
+                print "ENGLISH> ";
+                $resp_engl = <STDIN>;
+                chomp $resp_engl;
+            } else {
+                $resp_engl = '';
+            }
+        }
+    }
+    return ($resp_piny, $resp_engl);
+}
+
+sub check_register {
+    my ($words, $register, $check_only) = @_;
+    $check_only ||= '';
+    my $status = 0;
+    open REG, "<$register";
+    while (<REG>) {
+        chomp;
+        if (/^\Q$words\E/ and /\+{$threshold}$/) {
+            if ($check_only) {
+                $status = 1;
+            } else {
+                my $random = int(rand(100)) + 1;
+                if ($random > $skip) {
+                    $status = 1;
+                    my ($word, $hist) = /^(.*) ([+-]+)$/;
+                    print "    [$word] [$hist]\n";
+                }
+            }
+        }
+    }
+    close REG;
+    return $status;
+}
+
+sub elapsed {
+    my ($ssec, $smil, $fsec, $fmil) = @_;
+    my ($esec, $emil, $elapsed);
+    if ($fmil >= $smil) {
+        $esec = $fsec - $ssec;
+        $emil = $fmil - $smil;
+    } else {
+        $esec = $fsec - $ssec + 1;
+        $emil = $fmil + 1000000 - $smil;
+    }
+    $emil = $emil / 1000000;
+    $elapsed = $esec + $emil;
+    #print "computed elapsed $elapsed sec\n";
+    return $elapsed;
+}
+
+sub fix_register {
+    my $ref = shift;
+    foreach my $register (@$ref) {
+        print "fixing register $register ...\n";
+        open FILE, "<$wordlist";
+        while (<FILE>) {
+            chomp;
+            my ($chars, $pinyin, $english, $section) = split /\|/;
+            open REGTMP, ">$register.tmp";
+            open REG, "<$register";
+            while (<REG>) {
+                chomp;
+                if (/\Q$chars $pinyin\E/ and !/\Q--> $english\E/) {
+                    /^.* ([+-]*)$/;
+                    print "CORRECTING:$chars|$pinyin\n";
+                    print REGTMP "$chars $pinyin --> $english $1\n";
+                } else {
+                    print REGTMP "$_\n";
+                }
+            }
+            close REG;
+            close REGTMP;
+            rename "$register.tmp", "$register";
+        }
+        close FILE;
+    }
+    exit;
+}
+
+sub get_classifier {
+    my ($english, $hid_cl) = @_;
+    my ($cl_char, $cl_pinyin, $rest);
+    if ($english =~ /CL:/) {
+        $classifier = $english;
+        $classifier =~ s/^.*CL:(.).*$/$1/;
+        $hid_cl =~ s/,? *CL:[^ ]+ / /g;  # one Chinese char matched by /.../
+        open FILE, "<$wordlist";
+        while (<FILE>) {
+    	if (/^$classifier\|/) {
+    	    chomp;
+    	    ($cl_char, $cl_pinyin, $rest) = split /\|/;
+    	    last;
+    	}
+        }
+        close FILE;
+    }
+    return ($cl_char, $cl_pinyin, $rest);
+}
+
+sub get_hist {
+    my ($words, $register) = @_;
+    my $str = '';
+    open REG, "<$register";
+    while (<REG>) {
+        chomp;
+        if (/^\Q$words\E/) {
+            s/^\Q$words\E +//;
+            $str = $_;
+            last;
+        }
+    }
+    close REG;
+    return $str;
+}
+
 sub get_line {
     my ($start_at, $finish_at) = @_;
 
@@ -252,6 +412,102 @@ sub get_line {
     }
     close FILE;
     return ($random, $line);
+}
+
+sub get_response {
+    my ($chars, $pinyin, $hid_cl, $hist_str, $mes,
+        $chinese_mode, $english_mode, $coin_toss) = @_;
+    my ($response, $resp_piny, $resp_engl);
+    if ($character_mode) {
+        print "$chars $hist_str $mes\n";
+        print 'ANSWER> ';
+        $response = <STDIN>;
+        ($resp_piny, $resp_engl) = break_up_response($response, $pinyin);
+        lookup_chars($chars);
+        print "$pinyin $hid_cl";
+    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
+        print "$chars $pinyin $hist_str $mes\n";
+        print 'ANSWER> ';
+        $response = <STDIN>;
+        print "$hid_cl";
+    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
+        print "$hid_cl $hist_str $mes\n";
+        print 'ANSWER> ';
+        $response = <STDIN>;
+        print "$chars $pinyin";
+    }
+}
+
+sub list_words {
+    my ($start_at, $finish_at, $register) = @_;
+    open FILE, "<$wordlist";
+    while (<FILE>) {
+        chomp;
+        next if $. < $start_at;
+        last if $. > $finish_at;
+        my ($char, $pinyin, $english, $section) = split /\|/;
+        next if check_register("$char $pinyin --> $english", $register, 'check_only');
+        printf "%-5s %-10s %-20s\n", $char, $pinyin, $english;
+    }
+    close FILE;
+    exit;
+}
+
+sub lookup_chars {
+    my $chars = shift;
+    my @chars = split '', $chars;
+    foreach my $c (@chars) {
+        print "$c:\n";
+        system("grep \"^ +[0-9][0-9]* $c\" $characters |sed -e 's/^/  /' |grep --color=auto $c");
+        print "\n";
+    }
+}
+
+sub on_exit {
+    !$got_to_main and exit;
+    my $now = localtime(time);
+    open LOG, ">>$logfile";
+    $average_correct =~ s/^(.*\.\d\d).*$/$1/;
+    $average_time =~ s/^(.*\.\d\d).*$/$1/;
+    print "attempted $attempted, correct $correct ($average_correct %), average time $average_time seconds.\n";
+    print LOG "$now: attempted $attempted, correct $correct ($average_correct %), average time $average_time seconds.\n";
+    foreach my $word (@incorrect) {
+        print LOG "  $word\n";
+    }
+    close LOG;
+    exit 0;
+}
+
+sub pinyin_compare {
+    my ($response, $pinyin) = @_;
+    $response ||= '';
+    chomp $response;
+    if ($response !~ /[a-zA-Z']/) {
+        return 0;
+    }
+    foreach my $i ('á', 'ā', 'ǎ', 'à') {
+        $pinyin =~ s/$i/a/g;
+    }
+    foreach my $i ('è', 'é', 'ē', 'ě') {
+        $pinyin =~ s/$i/e/g;
+    }
+    foreach my $i ('í', 'ī', 'ì', 'ǐ') {
+        $pinyin =~ s/$i/i/g;
+    }
+    foreach my $i ('ò', 'ō', 'ó', 'ǒ') {
+        $pinyin =~ s/$i/o/g;
+    }
+    foreach my $i ('ū', 'ù', 'ǔ', 'ú') {
+        $pinyin =~ s/$i/u/g;
+    }
+    foreach my $i ('ǚ', 'ǜ', 'ǘ') {
+        $pinyin =~ s/$i/v/g;
+    }
+    if ($pinyin =~ /\b$response\b/i) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
 sub process_dups {
@@ -354,174 +610,6 @@ sub process_section {
     return ($section, $section_length, $start_at, $finish_at);
 }
 
-sub list_words {
-    my ($start_at, $finish_at, $register) = @_;
-    open FILE, "<$wordlist";
-    while (<FILE>) {
-        chomp;
-        next if $. < $start_at;
-        last if $. > $finish_at;
-        my ($char, $pinyin, $english, $section) = split /\|/;
-        next if check_register("$char $pinyin --> $english", $register, 'check_only');
-        printf "%-5s %-10s %-20s\n", $char, $pinyin, $english;
-    }
-    close FILE;
-    exit;
-}
-
-sub get_classifier {
-    my ($english, $hid_cl) = @_;
-    my ($cl_char, $cl_pinyin, $rest);
-    if ($english =~ /CL:/) {
-        $classifier = $english;
-        $classifier =~ s/^.*CL:(.).*$/$1/;
-        $hid_cl =~ s/,? *CL:[^ ]+ / /g;  # one Chinese char matched by /.../
-        open FILE, "<$wordlist";
-        while (<FILE>) {
-    	if (/^$classifier\|/) {
-    	    chomp;
-    	    ($cl_char, $cl_pinyin, $rest) = split /\|/;
-    	    last;
-    	}
-        }
-        close FILE;
-    }
-    return ($cl_char, $cl_pinyin, $rest);
-}
-
-sub get_response {
-    my ($chars, $pinyin, $hid_cl, $hist_str, $mes,
-        $chinese_mode, $english_mode, $coin_toss) = @_;
-    my ($response, $resp_piny, $resp_engl);
-    if ($character_mode) {
-        print "$chars $hist_str $mes\n";
-        print 'ANSWER> ';
-        $response = <STDIN>;
-        ($resp_piny, $resp_engl) = break_up_response($response, $pinyin);
-        lookup_chars($chars);
-        print "$pinyin $hid_cl";
-    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
-        print "$chars $pinyin $hist_str $mes\n";
-        print 'ANSWER> ';
-        $response = <STDIN>;
-        print "$hid_cl";
-    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
-        print "$hid_cl $hist_str $mes\n";
-        print 'ANSWER> ';
-        $response = <STDIN>;
-        print "$chars $pinyin";
-    }
-}
-
-sub am_correct {
-    my ($coin_toss, $response, $resp_piny, $pinyin, $resp_engl, $english,
-        $honesty_mode, $character_mode, $chinese_mode, $english_mode) = @_;
-    my $am_correct;
-    if ($honesty_mode) {
-        print "correct? (y/n) ";
-        my $input = <STDIN>;
-        $am_correct = 1 if $input =~ /^y/i;
-    } elsif ($character_mode) {
-        $am_correct =
-            pinyin_compare($resp_piny, $pinyin) &&
-            pinyin_compare($resp_engl, $english);
-    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
-        $am_correct = pinyin_compare($response, $english);
-    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
-        $am_correct = pinyin_compare($response, $pinyin);
-    }
-    return $am_correct;
-}
-
-sub lookup_chars {
-    my $chars = shift;
-    my @chars = split '', $chars;
-    foreach my $c (@chars) {
-        print "$c:\n";
-        system("grep \"^ +[0-9][0-9]* $c\" $characters |sed -e 's/^/  /' |grep --color=auto $c");
-        print "\n";
-    }
-}
-
-sub elapsed {
-    my ($ssec, $smil, $fsec, $fmil) = @_;
-    my ($esec, $emil, $elapsed);
-    if ($fmil >= $smil) {
-        $esec = $fsec - $ssec;
-        $emil = $fmil - $smil;
-    } else {
-        $esec = $fsec - $ssec + 1;
-        $emil = $fmil + 1000000 - $smil;
-    }
-    $emil = $emil / 1000000;
-    $elapsed = $esec + $emil;
-    #print "computed elapsed $elapsed sec\n";
-    return $elapsed;
-}
-
-sub pinyin_compare {
-    my ($response, $pinyin) = @_;
-    $response ||= '';
-    chomp $response;
-    if ($response !~ /[a-zA-Z']/) {
-        return 0;
-    }
-    foreach my $i ('á', 'ā', 'ǎ', 'à') {
-        $pinyin =~ s/$i/a/g;
-    }
-    foreach my $i ('è', 'é', 'ē', 'ě') {
-        $pinyin =~ s/$i/e/g;
-    }
-    foreach my $i ('í', 'ī', 'ì', 'ǐ') {
-        $pinyin =~ s/$i/i/g;
-    }
-    foreach my $i ('ò', 'ō', 'ó', 'ǒ') {
-        $pinyin =~ s/$i/o/g;
-    }
-    foreach my $i ('ū', 'ù', 'ǔ', 'ú') {
-        $pinyin =~ s/$i/u/g;
-    }
-    foreach my $i ('ǚ', 'ǜ', 'ǘ') {
-        $pinyin =~ s/$i/v/g;
-    }
-    if ($pinyin =~ /\b$response\b/i) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-sub break_up_response {
-    my ($response, $pinyin) = @_;
-    chomp $response;
-    $response =~ s/^ *//;
-    $response =~ s/ *$//;
-    $response =~ s/ +/ /g;
-    my ($resp_piny, $resp_engl);
-    # (\w|')+ - allow for words like qin'ai
-    if ($pinyin =~ /^(\w|')+ (\w|')+$/) {
-        ($resp_piny, $resp_engl) = ($response =~ /^((\w|')+ (\w|')+) (.*)$/);
-    } elsif ($pinyin =~ /^(\w|')+ (\w|')+ (\w|')+$/) {
-        ($resp_piny, $resp_engl) = ($response =~ /^((\w|')+ (\w|')+ (\w|')+) (.*)$/);
-    } elsif ($pinyin =~ /^(\w|')+ (\w|')+ (\w|')+ (\w|')+$/) {
-        ($resp_piny, $resp_engl) = ($response =~ /^((\w|')+ (\w|')+ (\w|')+ (\w|')+) (.*)$/);
-    } else {
-        if ($response =~ / /) {
-            ($resp_piny, $resp_engl) = ($response =~ /^((?:\w|')+) (.*)$/);
-        } else {
-            $resp_piny = $response;
-            if ($resp_piny) {
-                print "ENGLISH> ";
-                $resp_engl = <STDIN>;
-                chomp $resp_engl;
-            } else {
-                $resp_engl = '';
-            }
-        }
-    }
-    return ($resp_piny, $resp_engl);
-}
-
 sub update_register {
     my ($words, $correct, $register) = @_;
     my $modified = 0;
@@ -542,90 +630,6 @@ sub update_register {
     close REG;
     close TMPREG;
     rename "$register.tmp", "$register";
-}
-
-sub check_register {
-    my ($words, $register, $check_only) = @_;
-    $check_only ||= '';
-    my $status = 0;
-    open REG, "<$register";
-    while (<REG>) {
-        chomp;
-        if (/^\Q$words\E/ and /\+{$threshold}$/) {
-            if ($check_only) {
-                $status = 1;
-            } else {
-                my $random = int(rand(100)) + 1;
-                if ($random > $skip) {
-                    $status = 1;
-                    my ($word, $hist) = /^(.*) ([+-]+)$/;
-                    print "    [$word] [$hist]\n";
-                }
-            }
-        }
-    }
-    close REG;
-    return $status;
-}
-
-sub get_hist {
-    my ($words, $register) = @_;
-    my $str = '';
-    open REG, "<$register";
-    while (<REG>) {
-        chomp;
-        if (/^\Q$words\E/) {
-            s/^\Q$words\E +//;
-            $str = $_;
-            last;
-        }
-    }
-    close REG;
-    return $str;
-}
-
-sub fix_register {
-    my $ref = shift;
-    foreach my $register (@$ref) {
-        print "fixing register $register ...\n";
-        open FILE, "<$wordlist";
-        while (<FILE>) {
-            chomp;
-            my ($chars, $pinyin, $english, $section) = split /\|/;
-            open REGTMP, ">$register.tmp";
-            open REG, "<$register";
-            while (<REG>) {
-                chomp;
-                if (/\Q$chars $pinyin\E/ and !/\Q--> $english\E/) {
-                    /^.* ([+-]*)$/;
-                    print "CORRECTING:$chars|$pinyin\n";
-                    print REGTMP "$chars $pinyin --> $english $1\n";
-                } else {
-                    print REGTMP "$_\n";
-                }
-            }
-            close REG;
-            close REGTMP;
-            rename "$register.tmp", "$register";
-        }
-        close FILE;
-    }
-    exit;
-}
-
-sub on_exit {
-    !$got_to_main and exit;
-    my $now = localtime(time);
-    open LOG, ">>$logfile";
-    $average_correct =~ s/^(.*\.\d\d).*$/$1/;
-    $average_time =~ s/^(.*\.\d\d).*$/$1/;
-    print "attempted $attempted, correct $correct ($average_correct %), average time $average_time seconds.\n";
-    print LOG "$now: attempted $attempted, correct $correct ($average_correct %), average time $average_time seconds.\n";
-    foreach my $word (@incorrect) {
-        print LOG "  $word\n";
-    }
-    close LOG;
-    exit 0;
 }
 
 # end of script
