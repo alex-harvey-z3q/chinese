@@ -192,20 +192,9 @@ for (;;) {
     my $elapsed = elapsed($ssec, $smil, $fsec, $fmil);
 
     # figure out if the answer was correct.
-    my $am_correct;
-    if ($honesty_mode) {
-        print "correct? (y/n) ";
-        my $input = <STDIN>;
-        $am_correct = 1 if $input =~ /^y/i;
-    } elsif ($character_mode) {
-        $am_correct =
-            pinyin_compare($resp_piny, $pinyin) &&
-            pinyin_compare($resp_engl, $english);
-    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
-        $am_correct = pinyin_compare($response, $english);
-    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
-        $am_correct = pinyin_compare($response, $pinyin);
-    }
+    my $am_correct = am_correct($coin_toss, $response, $resp_piny,
+        $pinyin, $resp_engl, $english, $honesty_mode, $character_mode,
+            $chinese_mode, $english_mode);
 
     # if correct, so far, also check the classifier in classifier mode.
     if ($classifier and $am_correct) {
@@ -422,6 +411,26 @@ sub get_response {
         $response = <STDIN>;
         print "$chars $pinyin";
     }
+}
+
+sub am_correct {
+    my ($coin_toss, $response, $resp_piny, $pinyin, $resp_engl, $english,
+        $honesty_mode, $character_mode, $chinese_mode, $english_mode) = @_;
+    my $am_correct;
+    if ($honesty_mode) {
+        print "correct? (y/n) ";
+        my $input = <STDIN>;
+        $am_correct = 1 if $input =~ /^y/i;
+    } elsif ($character_mode) {
+        $am_correct =
+            pinyin_compare($resp_piny, $pinyin) &&
+            pinyin_compare($resp_engl, $english);
+    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
+        $am_correct = pinyin_compare($response, $english);
+    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
+        $am_correct = pinyin_compare($response, $pinyin);
+    }
+    return $am_correct;
 }
 
 sub lookup_chars {
