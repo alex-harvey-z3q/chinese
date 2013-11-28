@@ -83,6 +83,8 @@ for (;;) {
 
     insert_line($line, $section);
 
+    undef $english;
+    @char_defs = ();
 }
 
 sub insert_line {
