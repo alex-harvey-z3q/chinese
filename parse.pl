@@ -29,7 +29,8 @@ while (<DATA>) {
         chomp;
         $english = $_;
         $english =~ s# /#,#g;
-        $english =~ s/CL: /CL:/g;
+        $english =~ s/CL: (.), (.), (.)/CL:$1\\$2\\$3/g;
+        $english =~ s/CL: (.), (.)/CL:$1\\$2/g;
         next;
     }
     if (defined($english)) {
@@ -55,13 +56,13 @@ while (<DATA>) {
 print "$chars|$pinyin|$english (" . join(' / ', @char_defs) . ")\n";
 
 __DATA__
-咖啡馆
-kā​fēi​guǎn​
+牛奶
+niú​nǎi​
 	
 	
-café / coffee shop / CL: 家
+cow's milk / CL: 瓶, 杯
 	
-咖啡館
+HSK 2
 Character		Tot Str
 Rad / Str	Mandarin
 Pīnyīn	Unihan Definition
@@ -70,40 +71,26 @@ standalone and in compounds
 Cantonese	Variant
 Four corner
 Cangjie
-咖
+牛
 	
 	
-8画
-口 + 5
+4画
+牛牜 + 0
 	
-kā, gā
+niú
 	
-coffee; a phonetic
+cow, ox, bull; KangXi radical93
 	
-gaa1, gaa3, kaa1
+ngau4
 	
-6600.0
-RKSR
-啡
-	
-	
-11画
-口 + 8
-	
-fēi, pēi
-	
-morphine; coffee
-	
-fe1, fei1
-	
-6101.1
-RLMY
-馆
+2500.0
+HQ
+奶
 	
 	
-11画
-饣 + 8
+5画
+女 + 2
 	
-guǎn
+nǎi
 	
-public building 
+milk; woman's breasts; nurse 
