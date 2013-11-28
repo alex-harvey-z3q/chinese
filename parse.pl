@@ -31,6 +31,7 @@ while (<DATA>) {
         $english =~ s# /#,#g;
         $english =~ s/CL: (.), (.), (.)/CL:$1\\$2\\$3/g;
         $english =~ s/CL: (.), (.)/CL:$1\\$2/g;
+        $english =~ s/CL: .｜(.)/CL:$1/g;
         next;
     }
     if (defined($english)) {
