@@ -4,27 +4,30 @@ use strict;
 use warnings;
 
 use utf8;
-use open ':encoding(utf8)';
+
 binmode(STDOUT, ':utf8');
+binmode(STDIN, ':utf8');
 
 my ($chars, $pinyin, $english);
 my @char_defs;
 my $found_strokes = 0;
 my $found_pinyin = 0;
 
-while (<DATA>) {
-    if ($. == 1) {
+my $i = 0;
+while (defined($_ = <STDIN>)) {
+    ++$i;
+    if ($i == 1) {
         chomp;
         $chars = $_;
         next;
     }
-    if ($. == 2) {
+    if ($i == 2) {
         chomp;
         $pinyin = $_;
         $pinyin =~ s/\x{200b}//g;
         next;
     }
-    if ($. > 2 and !defined($english)) {
+    if ($i > 2 and !defined($english)) {
         next if /^	/;
         chomp;
         $english = $_;
@@ -61,8 +64,3 @@ if ($#char_defs > 0) {
 }
 
 __DATA__
-座
-zuò​
-	
-	
-seat / base / stand / CL: 個｜个 / classifier for buildings, mountains and similar immovable objects 
