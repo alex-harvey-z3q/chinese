@@ -5,7 +5,7 @@ use warnings;
 
 use utf8;
 use open ':encoding(utf8)';
-binmode(STDOUT, ":utf8");
+binmode(STDOUT, ':utf8');
 
 use Time::HiRes qw(gettimeofday);
 use Getopt::Long qw(:config no_ignore_case);
