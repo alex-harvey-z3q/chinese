@@ -53,44 +53,15 @@ while (<DATA>) {
     }
 }
 
-print "$chars|$pinyin|$english (" . join(' / ', @char_defs) . ")\n";
+if ($#char_defs > 0) {
+    print "$chars|$pinyin|$english (" . join(' / ', @char_defs) . ")\n";
+} else {
+    print "$chars|$pinyin|$english\n";
+}
 
 __DATA__
-牛奶
-niú​nǎi​
+座
+zuò​
 	
 	
-cow's milk / CL: 瓶, 杯
-	
-HSK 2
-Character		Tot Str
-Rad / Str	Mandarin
-Pīnyīn	Unihan Definition
-standalone and in compounds
-	Jyutping
-Cantonese	Variant
-Four corner
-Cangjie
-牛
-	
-	
-4画
-牛牜 + 0
-	
-niú
-	
-cow, ox, bull; KangXi radical93
-	
-ngau4
-	
-2500.0
-HQ
-奶
-	
-	
-5画
-女 + 2
-	
-nǎi
-	
-milk; woman's breasts; nurse 
+seat / base / stand / CL: 個｜个 / classifier for buildings, mountains and similar immovable objects 
