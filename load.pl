@@ -14,10 +14,31 @@ my $found_strokes = 0;
 my $found_pinyin = 0;
 
 my $wordlist = 'chinese';
+my $lastsect = 'last_section';
 
-print "Section? ";
-my $section = <STDIN>;
-chomp($section);
+open FILE, "<$lastsect";
+my $default_section = <FILE>;
+chomp $default_section;
+close FILE;
+
+my $section;
+print "Section? [$default_section] ";
+while ($section = <STDIN>) {
+    chomp($section);
+    if ($section eq 'list') {
+        list_sections();
+        print "\n";
+        print 'Section? ';
+    } elsif ($section eq '') {
+        $section = $default_section;
+        last;
+    } else {
+        open FILE, ">$lastsect";
+        print FILE $section;
+        close FILE;
+        last;
+    }
+}
 
 if (no_such_section($section)) {
     print "No such section '$section'\n";
@@ -28,10 +49,9 @@ if (no_such_section($section)) {
 
 for (;;) {
 
-    my $i = 0;
     print "Copy and paste a word here:\n";
-    while (defined($_ = <STDIN>)) {
-        ++$i;
+
+    for (my $i=1; defined($_ = <STDIN>); ++$i) {
         if ($i == 1) {
             chomp;
             $chars = $_;
@@ -50,7 +70,10 @@ for (;;) {
             $english =~ s# /#,#g;
             $english =~ s/CL: (.), (.), (.)/CL:$1\\$2\\$3/g;
             $english =~ s/CL: (.), (.)/CL:$1\\$2/g;
+            $english =~ s/CL: .｜(.), .｜(.), .｜(.)/CL:$1\\$2\\$3/g;
+            $english =~ s/CL: .｜(.), .｜(.)/CL:$1\\$2/g;
             $english =~ s/CL: .｜(.)/CL:$1/g;
+            $english =~ s/CL: (.), .｜(.)/CL:$1\\$2/g;
             $english =~ s/CL: /CL:/g;
             next;
         }
@@ -85,6 +108,17 @@ for (;;) {
 
     undef $english;
     @char_defs = ();
+}
+
+sub list_sections {
+    my @sections = ();
+    open FILE, "<$wordlist";
+    while (<FILE>) {
+        chomp;
+        my ($a, $b, $c, $s) = split /\|/;
+        push @sections, $s unless grep { $_ eq $s } @sections;
+    }
+    print "$_\n" foreach (@sections);
 }
 
 sub insert_line {
