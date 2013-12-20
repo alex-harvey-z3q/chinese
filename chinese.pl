@@ -308,6 +308,23 @@ sub check_register {
     return $status;
 }
 
+sub process_command {
+    my $command = shift;
+    if ($$command =~ /^LK/) {
+        chomp $$command;
+        my ($word) = ($$command =~ /LK +(.*)/);
+        system("awk -F'\|' '{print \"  \"\$1\"   \"\$2\"   \"\$3}' $wordlist |grep --color=auto '$word'");
+        system("echo");
+        $$command = undef; # signals calling function that response contained a command.
+    } elsif ($$command =~ /^CR/) {
+        chomp $$command;
+        my ($word) = ($$command =~ /CR +(.*)/);
+        system("grep -w '$word' $characters |grep --color=auto '^.*$word'");
+        system("echo");
+        $$command = undef;
+    }
+}
+
 sub elapsed {
     my ($ssec, $smil, $fsec, $fmil) = @_;
     my ($esec, $emil, $elapsed);
@@ -417,25 +434,35 @@ sub get_line {
 sub get_response {
     my ($chars, $pinyin, $hid_cl, $hist_str, $mes,
         $chinese_mode, $english_mode, $coin_toss) = @_;
-    my ($response, $resp_piny, $resp_engl);
+    my ($response, $resp_piny, $resp_engl,
+        $before_line, $after_line, $command);
+
+    # determine before and after lines to be printed.
     if ($character_mode) {
-        print "$chars $hist_str $mes\n";
+        $before_line = "$chars $hist_str $mes\n";
+        $after_line = "$pinyin $hid_cl";
+    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
+        $before_line = "$chars $pinyin $hist_str $mes\n";
+        $after_line = "$hid_cl";
+    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
+        $before_line = "$hid_cl $hist_str $mes\n";
+        $after_line = "$chars $pinyin";
+    }
+
+    # print these, but handle character_mode differently (for now..).
+    while (!defined $response) {
+        print $before_line;
         print 'ANSWER> ';
         $response = <STDIN>;
+        chomp($response);
+        process_command(\$response);
+    }
+ 
+    if ($character_mode) {
         ($resp_piny, $resp_engl) = break_up_response($response, $pinyin);
         lookup_chars($chars);
-        print "$pinyin $hid_cl";
-    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
-        print "$chars $pinyin $hist_str $mes\n";
-        print 'ANSWER> ';
-        $response = <STDIN>;
-        print "$hid_cl";
-    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
-        print "$hid_cl $hist_str $mes\n";
-        print 'ANSWER> ';
-        $response = <STDIN>;
-        print "$chars $pinyin";
     }
+    print $after_line;
 }
 
 sub list_words {
