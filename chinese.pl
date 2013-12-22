@@ -93,16 +93,16 @@ EOF
 }
 
 # process help.
-$help and usage();
+usage() if $help;
 
 # process $list_dups_mode.
-$list_dups_mode and process_dups();
+process_dups() if $list_dups_mode;
 
 # process $fixreg_mode.
-$fixreg_mode and fix_register([$register, $character_register, $classifier_register]);
+fix_register([$register, $character_register, $classifier_register]) if $fixreg_mode;
 
 # in character mode use a different register.
-$character_mode and $register = $character_register;
+$register = $character_register if $character_mode;
 
 # process $list_mode.
 if ($list_mode) {
@@ -118,7 +118,7 @@ if ($list_words_mode or $choose_section or $section) {
 }
 
 # list words mode.
-$list_words_mode and list_words($start_at, $finish_at, $register);
+list_words($start_at, $finish_at, $register) if $list_words_mode;
 
 # seed the randomiser.
 srand;
