@@ -104,18 +104,15 @@ fix_register([$register, $character_register, $classifier_register]) if $fixreg_
 # in character mode use a different register.
 $register = $character_register if $character_mode;
 
-# process $list_mode.
-if ($list_mode) {
-    system "cut -f4 -d'|' $wordlist |sort -u";
-    exit;
-}
-
 # process $choose_section.
 my $section_length = $lines;
 if ($list_words_mode or $choose_section or $section) {
     ($section, $section_length, $start_at, $finish_at)
         = process_section($lines, $section);
 }
+
+# process $list_mode.
+list_sections() if $list_mode;
 
 # list words mode.
 list_words($start_at, $finish_at, $register) if $list_words_mode;
@@ -145,7 +142,7 @@ for (;;) {
     ++$presented;
 
     # question message.
-    my $mes = "[$presented of " . ($section_length+1) . ']';
+    my $mes = '[' . "$presented of " . ($section_length + 1) . ']';
 
     # push this number onto the stack.
     push @stack, $random;
@@ -181,12 +178,8 @@ for (;;) {
             $chinese_mode, $english_mode, $coin_toss);
 
     # also add section unless we're in section mode.
-    if (defined $section) {
-        print "\n";
-    } else {
-        print " [$sect]\n";
-    }
-        
+    print defined $section ? "\n" : " [$sect]\n";
+
     # stop timer and compute elapsed time.
     my ($fsec, $fmil) = gettimeofday();
     my $elapsed = elapsed($ssec, $smil, $fsec, $fmil);
@@ -465,6 +458,29 @@ sub get_response {
     print $after_line;
 }
 
+sub list_sections {
+
+    # build sections.
+    my @sections;
+    open FILE, "<$wordlist";
+    while (<FILE>) {
+        chomp;
+        my ($a, $b, $c, $s) = split /\|/;
+        push @sections, $s unless grep { $_ eq $s } @sections;
+    }
+    close FILE;
+
+    # sorted.
+    my @sorted = sort @sections;
+
+    # print with numbers.
+    for (my $i=0; $i <= $#sorted; ++$i) {
+        print "$i. ", $sorted[$i], "\n";
+    }
+
+    exit;
+}
+
 sub list_words {
     my ($start_at, $finish_at, $register) = @_;
     open FILE, "<$wordlist";
@@ -485,7 +501,7 @@ sub lookup_chars {
     my @chars = split '', $chars;
     foreach my $c (@chars) {
         print "$c:\n";
-        system("grep \"^ +[0-9][0-9]* $c\" $characters |sed -e 's/^/  /' |grep --color=auto $c");
+        system("grep \"[0-9][0-9]* $c\" $characters |sed -e 's/^/  /' |grep --color=auto $c");
         print "\n";
     }
 }
