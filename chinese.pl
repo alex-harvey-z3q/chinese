@@ -307,13 +307,16 @@ sub process_command {
         chomp $$command;
         my ($word) = ($$command =~ /LK +(.*)/);
         system("awk -F'\|' '{print \"  \"\$1\"   \"\$2\"   \"\$3}' $wordlist |grep --color=auto '$word'");
-        system("echo");
+        print "\n";
         $$command = undef; # signals calling function that response contained a command.
     } elsif ($$command =~ /^CR/) {
         chomp $$command;
         my ($word) = ($$command =~ /CR +(.*)/);
         system("grep -w '$word' $characters |grep --color=auto '^.*$word'");
-        system("echo");
+        print "\n";
+        $$command = undef;
+    } elsif ($$command =~ /^PR/) {
+        print "\n";
         $$command = undef;
     }
 }
