@@ -8,6 +8,7 @@ use open ':encoding(utf8)';
 binmode(STDOUT, ':utf8');
 
 use Time::HiRes qw(gettimeofday);
+use Term::ANSIColor;
 use Getopt::Long qw(:config no_ignore_case);
 
 my $logfile = 'chinese.log';
@@ -284,7 +285,7 @@ sub check_register {
                 if ($random > $skip) {
                     $status = 1;
                     my ($word, $hist) = /^(.*) ([+-]+)$/;
-                    print "    [$word] [$hist]\n";
+                    print color('cyan'), "    [$word] [$hist]\n", color('reset');
                 }
             }
         }
@@ -495,8 +496,21 @@ sub lookup_chars {
     my $chars = shift;
     my @chars = split '', $chars;
     foreach my $c (@chars) {
-        print "$c:\n";
-        system("grep \"[0-9][0-9]* $c\" $characters |sed -e 's/^/  /' |grep --color=auto $c");
+        print color('bold red'), $c, color('reset'), ":\n";
+        open FILE, "<$characters";
+        while (<FILE>) {
+            chomp;
+            next if !/\+\d+ $c/;
+            my @bit = split /$c/;
+            print '  ';
+            print color('cyan'), $bit[0];
+            for (my $i=1; $i<=$#bit; $i++) {
+                print color('bold red'), $c, color('reset');
+                print color('cyan'), $bit[$i], color('reset');
+            }
+            print "\n";
+        }
+        close FILE;
         print "\n";
     }
 }
