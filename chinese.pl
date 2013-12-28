@@ -119,10 +119,10 @@ for (;;) {
     last if ($#stack == $section_length);
 
     # get a random line
-    my ($random, $line) = get_line($start_at, $finish_at);
+    my ($line, $line_number) = get_line($start_at, $finish_at);
 
     # get another one if it's already on the stack.
-    next if (grep {$_ == $random} @stack) and $no_repeats;
+    next if (grep {$_ == $line_number} @stack) and $no_repeats;
 
     # if we get here, this word gets presented.
     ++$presented;
@@ -131,7 +131,7 @@ for (;;) {
     my $mes = '[' . "$presented of " . ($section_length + 1) . ']';
 
     # push this number onto the stack.
-    push @stack, $random;
+    push @stack, $line_number;
 
     # get the chinese word
     my ($chars, $pinyin, $english, $sect) = split /\|/, $line;
@@ -369,7 +369,7 @@ sub get_line {
         }
     }
     close FILE;
-    return ($random, $line);
+    return ($line, $random);
 }
 
 sub get_response {
