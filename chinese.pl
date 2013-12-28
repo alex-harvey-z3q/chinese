@@ -16,7 +16,6 @@ my $wordlist = 'chinese';
 my $register = 'chinese.reg';
 my $characters = 'characters';
 my $character_register = 'chinese_char.reg';
-my $classifier_register = 'chinese_class.reg';
 my $threshold = 5;
 my $skip = 20;
 
@@ -44,8 +43,7 @@ my $finish_at = $lines;
 my ($help, $choose_section, $section,
     $list_mode, $list_dups_mode, $character_mode,
     $honesty_mode, $chinese_mode, $english_mode,
-    $classifier_mode, $fixreg_mode,
-    $list_words_mode);
+    $fixreg_mode, $list_words_mode);
 GetOptions(
     'help|h' => \$help,
     'start|t=s'  => \$start_at,
@@ -59,7 +57,6 @@ GetOptions(
     'honesty|O' => \$honesty_mode,
     'chinese|c' => \$chinese_mode,
     'english|e' => \$english_mode,
-    'classifier|i' =>\$classifier_mode,
     'fixreg|F' =>\$fixreg_mode,
     'threshold|T=s' => \$threshold,
     'skip|K=s' => \$skip,
@@ -82,7 +79,6 @@ Usage: $0 [-t <start_line> -f <finish_line> | -s <section> | -H ] [-lOcCeiT]
     --chinese|-c    - chinese mode
     --character|-C  - chinese character mode
     --english|-e    - english mode
-    --classifier|-i - classifier mode
     --threshold|-T <threshold> - set number correct threshold
       -T 100   - only consider skipping if this word is right 100 times in a row
       -T 1     - consider skipping if this word was right last time
@@ -96,7 +92,7 @@ EOF
 # process various options.
 usage() if $help;
 process_dups() if $list_dups_mode;
-fix_register([$register, $character_register, $classifier_register]) if $fixreg_mode;
+fix_register([$register, $character_register]) if $fixreg_mode;
 list_sections() if $list_mode;
 list_words($start_at, $finish_at, $register) if $list_words_mode;
 
@@ -112,9 +108,6 @@ if ($list_words_mode or $choose_section or $section) {
 
 # seed the randomiser.
 srand;
-
-# classifier flag.
-my $classifier = '';
 
 # main loop.
 for (;;) {
@@ -143,9 +136,6 @@ for (;;) {
     # get the chinese word
     my ($chars, $pinyin, $english, $sect) = split /\|/, $line;
 
-    # hid_cl used to hide the classifier in classifer_mode.
-    my $hid_cl = $english;
-
     # formatted string used in log and register.
     my $log_text = "$chars $pinyin --> $english";
 
@@ -155,10 +145,6 @@ for (;;) {
     # get another number if we got this word right $threshold times.
     next if check_register($log_text, $register);
 
-    # in classifer mode figure out the classifier where applicable.
-    my ($cl_char, $cl_pinyin, $rest) = $classifier_mode ?
-        get_classifier($english, $hid_cl) : (undef, undef, undef);
-    
     # start timer.
     my ($ssec, $smil) = gettimeofday();
 
@@ -167,7 +153,7 @@ for (;;) {
 
     # now, either print a Chinese or an English word and get response.
     my ($response, $resp_piny, $resp_engl) =
-        get_response($chars, $pinyin, $hid_cl, $hist_str, $mes,
+        get_response($chars, $pinyin, $english, $hist_str, $mes,
             $chinese_mode, $english_mode, $coin_toss);
 
     # also add section unless we're in section mode.
@@ -182,19 +168,6 @@ for (;;) {
         $pinyin, $resp_engl, $english, $honesty_mode, $character_mode,
             $chinese_mode, $english_mode);
 
-    # if correct, so far, also check the classifier in classifier mode.
-    if ($classifier and $am_correct) {
-        print 'CLASSIFIER> ';
-        my $cl_response = <STDIN>;
-        $cl_response ||= '';
-        print "$cl_char $cl_pinyin\n";
-        if (pinyin_compare($cl_response, $cl_pinyin)) {
-            update_register($log_text, '+', $classifier_register);
-        } else {
-            update_register($log_text, '-', $classifier_register);
-        }
-    }
- 
     # update the register.
     if ($am_correct) {  
         ++$correct;
@@ -209,7 +182,6 @@ for (;;) {
     $average_correct = ($correct / $attempted) * 100;
     $average_time = ((($average_time * ($attempted - 1)) + $elapsed) / $attempted);
 
-    $classifier = '';
     print "\n";
 }
 
@@ -359,26 +331,6 @@ sub fix_register {
     exit;
 }
 
-sub get_classifier {
-    my ($english, $hid_cl) = @_;
-    my ($cl_char, $cl_pinyin, $rest);
-    if ($english =~ /CL:/) {
-        $classifier = $english;
-        $classifier =~ s/^.*CL:(.).*$/$1/;
-        $hid_cl =~ s/,? *CL:[^ ]+ / /g;  # one Chinese char matched by /.../
-        open FILE, "<$wordlist";
-        while (<FILE>) {
-    	if (/^$classifier\|/) {
-    	    chomp;
-    	    ($cl_char, $cl_pinyin, $rest) = split /\|/;
-    	    last;
-    	}
-        }
-        close FILE;
-    }
-    return ($cl_char, $cl_pinyin, $rest);
-}
-
 sub get_hist {
     my ($words, $register) = @_;
     my $str = '';
@@ -421,7 +373,7 @@ sub get_line {
 }
 
 sub get_response {
-    my ($chars, $pinyin, $hid_cl, $hist_str, $mes,
+    my ($chars, $pinyin, $english, $hist_str, $mes,
         $chinese_mode, $english_mode, $coin_toss) = @_;
     my ($response, $resp_piny, $resp_engl,
         $before_line, $after_line, $command);
@@ -429,12 +381,12 @@ sub get_response {
     # determine before and after lines to be printed.
     if ($character_mode) {
         $before_line = "$chars $hist_str $mes\n";
-        $after_line = "$pinyin $hid_cl";
+        $after_line = "$pinyin $english";
     } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
         $before_line = "$chars $pinyin $hist_str $mes\n";
-        $after_line = "$hid_cl";
+        $after_line = $english;
     } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
-        $before_line = "$hid_cl $hist_str $mes\n";
+        $before_line = "$english $hist_str $mes\n";
         $after_line = "$chars $pinyin";
     }
 
