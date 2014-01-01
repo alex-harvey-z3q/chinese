@@ -6,183 +6,46 @@ use warnings;
 use utf8;
 use open ':encoding(utf8)';
 binmode(STDOUT, ':utf8');
+binmode(STDIN, ':utf8');
 
-use Time::HiRes qw(gettimeofday);
-use Term::ANSIColor;
 use Getopt::Long qw(:config no_ignore_case);
+use Term::ANSIColor;
+use List::Util 'shuffle';
 
-my $logfile = 'chinese.log';
 my $wordlist = 'chinese';
 my $register = 'chinese.reg';
 my $characters = 'characters';
-my $character_register = 'chinese_char.reg';
+my $grammar = 'grammar';
+my $grammar_reg = 'grammar.reg';
+
 my $threshold = 5;
 my $skip = 20;
 
-my $got_to_main = 0;
-my $attempted = 0;
-my $presented = 0;
-my $correct = 0;
-my $average_correct = 0;
-my $average_time = 0;
-my @incorrect = ();
-my @stack = ();
-my $no_repeats = 1;
-
-$SIG{INT} = \&on_exit;
-
-# count lines.
-my $lines = 0;
-open FILE, "<$wordlist";
-$lines++ while (<FILE>);
-close FILE;
-
-# input options.
-my $start_at = 0;
-my $finish_at = $lines;
-my ($help, $choose_section, $section,
-    $list_mode, $list_dups_mode, $character_mode,
-    $honesty_mode, $chinese_mode, $english_mode,
-    $fixreg_mode, $list_words_mode);
-GetOptions(
-    'help|h' => \$help,
-    'start|t=s'  => \$start_at,
-    'finish|f=s' => \$finish_at,
-    'choose-section|H' => \$choose_section,
-    'section|s=s' => \$section,
-    'list|L' => \$list_mode,
-    'list-words|l' => \$list_words_mode,
-    'list-dups|d' => \$list_dups_mode,
-    'character|C' => \$character_mode,
-    'honesty|O' => \$honesty_mode,
-    'chinese|c' => \$chinese_mode,
-    'english|e' => \$english_mode,
-    'fixreg|F' =>\$fixreg_mode,
-    'threshold|T=s' => \$threshold,
-    'skip|K=s' => \$skip,
-);
-
-sub usage {
-    print <<EOF;
-Usage: $0 {-h|-l|-d}
-    --help|-h      - show this help
-    --list|-L      - list sections
-    --list-dups|-d - list duplicates
-    --fixreg|-F    - fix the register
-
-Usage: $0 [-t <start_line> -f <finish_line> | -s <section> | -H ] [-lOcCeiT]
-    --start|-t / --finish|-f - start/finish lines
-    --section|-s <section> - specify the section number
-    --choose-section|-H - choose section from a menu
-    --list-words|-l - list words mode
-    --honesty|-O    - honesty mode
-    --chinese|-c    - chinese mode
-    --character|-C  - chinese character mode
-    --english|-e    - english mode
-    --threshold|-T <threshold> - set number correct threshold
-      -T 100   - only consider skipping if this word is right 100 times in a row
-      -T 1     - consider skipping if this word was right last time
-    --skip|-K <skip>           - set skip threshold
-      -K 100   - never skip a word
-      -K 0     - always skip, if threshold is met
-EOF
-    exit;
-}
-
-# process various options.
-usage() if $help;
-process_dups() if $list_dups_mode;
-fix_register([$register, $character_register]) if $fixreg_mode;
-list_sections() if $list_mode;
-list_words($start_at, $finish_at, $register) if $list_words_mode;
-
-# in character mode use a different register.
-$register = $character_register if $character_mode;
-
-# process $choose_section.
-my $section_length = $lines;
-if ($list_words_mode or $choose_section or $section) {
-    ($section, $section_length, $start_at, $finish_at)
-        = process_section($lines, $section);
-}
+my ($section, %mode) = process_options({
+    'mode' => 'vocabulary', 'selection' => 'random'});
 
 # seed the randomiser.
 srand;
 
+# process $choose_section.
+my @selection = get_selection($section, $mode{'mode'});
+my $length_of_selection = $#selection + 1;
+
 # main loop.
-for (;;) {
+my $total_correct = 0;
+my $presented = 1;
 
-    # set got to main for use in on_exit.
-    $got_to_main = 1;
+$SIG{INT} = \&on_exit;
 
-    # finished if $#stack = section length.
-    last if ($#stack == $section_length);
+foreach my $q (@selection) {
 
-    # get a random line
-    my ($line, $line_number) = get_line($start_at, $finish_at);
+    # ask a question.
+    my $am_correct = ask_a_question($q, \%mode, $presented, $length_of_selection);
 
-    # get another one if it's already on the stack.
-    next if (grep {$_ == $line_number} @stack) and $no_repeats;
+    # total correct.
+    $total_correct += $am_correct;
 
-    # if we get here, this word gets presented.
     ++$presented;
-
-    # question message.
-    my $mes = '[' . "$presented of " . ($section_length + 1) . ']';
-
-    # push this number onto the stack.
-    push @stack, $line_number;
-
-    # get the chinese word
-    my ($chars, $pinyin, $english, $sect) = split /\|/, $line;
-
-    # formatted string used in log and register.
-    my $log_text = "$chars $pinyin --> $english";
-
-    # string of history on this word.
-    my $hist_str = '[' . get_hist($log_text, $register) . ']';
-
-    # get another number if we got this word right $threshold times.
-    next if check_register($log_text, $register);
-
-    # start timer.
-    my ($ssec, $smil) = gettimeofday();
-
-    # coin toss.
-    my $coin_toss = int(rand(2));
-
-    # now, either print a Chinese or an English word and get response.
-    my ($response, $resp_piny, $resp_engl) =
-        get_response($chars, $pinyin, $english, $hist_str, $mes,
-            $chinese_mode, $english_mode, $coin_toss);
-
-    # also add section unless we're in section mode.
-    print defined $section ? "\n" : " [$sect]\n";
-
-    # stop timer and compute elapsed time.
-    my ($fsec, $fmil) = gettimeofday();
-    my $elapsed = elapsed($ssec, $smil, $fsec, $fmil);
-
-    # figure out if the answer was correct.
-    my $am_correct = am_correct($coin_toss, $response, $resp_piny,
-        $pinyin, $resp_engl, $english, $honesty_mode, $character_mode,
-            $chinese_mode, $english_mode);
-
-    # update the register.
-    if ($am_correct) {  
-        ++$correct;
-        update_register($log_text, '+', $register);
-    } else {
-        push @incorrect, $log_text;
-        update_register($log_text, '-', $register);
-    }
-
-    # update counters.
-    ++$attempted;
-    $average_correct = ($correct / $attempted) * 100;
-    $average_time = ((($average_time * ($attempted - 1)) + $elapsed) / $attempted);
-
-    print "\n";
 }
 
 on_exit();
@@ -191,55 +54,57 @@ on_exit();
 ## subroutines
 ##
 
-sub am_correct {
-    my ($coin_toss, $response, $resp_piny, $pinyin, $resp_engl, $english,
-        $honesty_mode, $character_mode, $chinese_mode, $english_mode) = @_;
-    my $am_correct;
-    if ($honesty_mode) {
-        print "correct? (y/n) ";
-        my $input = <STDIN>;
-        $am_correct = 1 if $input =~ /^y/i;
-    } elsif ($character_mode) {
-        $am_correct =
-            pinyin_compare($resp_piny, $pinyin) &&
-            pinyin_compare($resp_engl, $english);
-    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
-        $am_correct = pinyin_compare($response, $english);
-    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
-        $am_correct = pinyin_compare($response, $pinyin);
+sub ask_a_question {
+    my ($q, $m, $presented, $length_of_selection) = @_;
+    my ($simplified, $traditional, $pinyin, $english, $section) = @$q;
+    my %mode = %{ $m };
+    my ($chinese_chars_in_question, $history_reg, $log_text);
+    if ($mode{'mode'} eq 'grammar') {
+         $chinese_chars_in_question = $simplified;
+         $history_reg = $grammar_reg;
+         $log_text = $simplified;
+    } elsif ($mode{'mode'} eq 'vocabulary') {
+         $chinese_chars_in_question = "$simplified/$traditional";
+         $history_reg = $register;
+         $log_text = "$simplified $pinyin -> $english";
     }
-    return $am_correct;
-}
-
-sub break_up_response {
-    my ($response, $pinyin) = @_;
-    chomp $response;
-    $response =~ s/^ *//;
-    $response =~ s/ *$//;
-    $response =~ s/ +/ /g;
-    my ($resp_piny, $resp_engl);
-    # (\w|')+ - allow for words like qin'ai
-    if ($pinyin =~ /^(\w|')+ (\w|')+$/) {
-        ($resp_piny, $resp_engl) = ($response =~ /^((\w|')+ (\w|')+) (.*)$/);
-    } elsif ($pinyin =~ /^(\w|')+ (\w|')+ (\w|')+$/) {
-        ($resp_piny, $resp_engl) = ($response =~ /^((\w|')+ (\w|')+ (\w|')+) (.*)$/);
-    } elsif ($pinyin =~ /^(\w|')+ (\w|')+ (\w|')+ (\w|')+$/) {
-        ($resp_piny, $resp_engl) = ($response =~ /^((\w|')+ (\w|')+ (\w|')+ (\w|')+) (.*)$/);
-    } else {
-        if ($response =~ / /) {
-            ($resp_piny, $resp_engl) = ($response =~ /^((?:\w|')+) (.*)$/);
-        } else {
-            $resp_piny = $response;
-            if ($resp_piny) {
-                print "ENGLISH> ";
-                $resp_engl = <STDIN>;
-                chomp $resp_engl;
-            } else {
-                $resp_engl = '';
-            }
+    my ($question_line, $answer_line, $response, $am_correct);
+    my $chars = $traditional ? "$simplified/$traditional" : $simplified;
+    my $coin_toss = int(rand(2));
+    my $hist_str = get_hist($simplified, $history_reg);
+    return if check_register($log_text, $history_reg);
+    if ($mode{'selection'} eq 'chinese' or
+       ($mode{'selection'} eq 'random' and $coin_toss == 0)) {
+        while (!defined $response) {
+            print "$chinese_chars_in_question [$presented of $length_of_selection] $hist_str\n";
+            print 'ANSWER> ';
+            $response = <STDIN>;
+            chomp($response);
+            process_command(\$response);
         }
+        lookup_chars($simplified) unless $mode{'mode'} eq 'grammar';
+        print "\n";
+        print "$chars, $pinyin, $english [$section]\n";
+        $am_correct = $response ? ($english =~ /$response/) : 0;
+    } elsif ($mode{'selection'} eq 'english' or
+       ($mode{'selection'} eq 'random' and $coin_toss == 1)) {
+        while (!defined $response) {
+            print "$english [$presented of $length_of_selection] $hist_str\n";
+            print 'ANSWER> ';
+            $response = <STDIN>;
+            chomp($response);
+            process_command(\$response);
+        }
+        print "\n";
+        print "$chars, $pinyin [$section]\n";
+        $am_correct = $response ? ($response eq $simplified) : 0;
     }
-    return ($resp_piny, $resp_engl);
+    print "\n";
+    my $plus_or_minus = $am_correct ? '+' : '-';
+    print $am_correct ? "CORRECT\n" : "INCORRECT\n";
+    print "\n";
+    update_register($simplified, $plus_or_minus, $history_reg);
+    return $am_correct;
 }
 
 sub check_register {
@@ -266,181 +131,94 @@ sub check_register {
     return $status;
 }
 
-sub process_command {
-    my $command = shift;
-    if ($$command =~ /^LK/) {
-        chomp $$command;
-        my ($word) = ($$command =~ /LK +(.*)/);
-        system("awk -F'\|' '{print \"  \"\$1\"   \"\$2\"   \"\$3}' $wordlist |grep --color=auto '$word'");
-        print "\n";
-        $$command = undef; # signals calling function that response contained a command.
-    } elsif ($$command =~ /^CR/) {
-        chomp $$command;
-        my ($word) = ($$command =~ /CR +(.*)/);
-        system("grep -w '$word' $characters |grep --color=auto '^.*$word'");
-        print "\n";
-        $$command = undef;
-    } elsif ($$command =~ /^PR/) {
-        print "\n";
-        $$command = undef;
-    }
-}
-
-sub elapsed {
-    my ($ssec, $smil, $fsec, $fmil) = @_;
-    my ($esec, $emil, $elapsed);
-    if ($fmil >= $smil) {
-        $esec = $fsec - $ssec;
-        $emil = $fmil - $smil;
-    } else {
-        $esec = $fsec - $ssec + 1;
-        $emil = $fmil + 1000000 - $smil;
-    }
-    $emil = $emil / 1000000;
-    $elapsed = $esec + $emil;
-    #print "computed elapsed $elapsed sec\n";
-    return $elapsed;
-}
-
-sub fix_register {
-    my $ref = shift;
-    foreach my $register (@$ref) {
-        print "fixing register $register ...\n";
-        open FILE, "<$wordlist";
-        while (<FILE>) {
-            chomp;
-            my ($chars, $pinyin, $english, $section) = split /\|/;
-            open REGTMP, ">$register.tmp";
-            open REG, "<$register";
-            while (<REG>) {
-                chomp;
-                if (/\Q$chars $pinyin\E/ and !/\Q--> $english\E/) {
-                    /^.* ([+-]*)$/;
-                    print "CORRECTING:$chars|$pinyin\n";
-                    print REGTMP "$chars $pinyin --> $english $1\n";
-                } else {
-                    print REGTMP "$_\n";
-                }
-            }
-            close REG;
-            close REGTMP;
-            rename "$register.tmp", "$register";
-        }
-        close FILE;
-    }
-    exit;
-}
-
 sub get_hist {
-    my ($words, $register) = @_;
+    my ($simplified, $register) = @_;
     my $str = '';
-    open REG, "<$register";
+    open REG, "<$register" or die "open: $register: $!";
     while (<REG>) {
         chomp;
-        if (/^\Q$words\E/) {
-            s/^\Q$words\E +//;
+        if (/^$simplified/) {
+            s/^$simplified//;
             $str = $_;
             last;
         }
     }
     close REG;
-    return $str;
+    return "[$str]";
 }
 
-sub get_line {
-    my ($start_at, $finish_at) = @_;
+sub get_selection {
+    my ($sect, $mode) = @_;
+    my @sections;
+    my @seen_sections;
+    my @selection;
+    my $file = $mode eq 'grammar' ? $grammar : $wordlist;
 
-    # get a random line.
-    my $random;
-    for (;;) {
-        $random = int(rand($lines)) + 1;
-        last if ($random >= $start_at
-             and $random <= $finish_at);
+    # build an array of alphabetically sorted sections.
+    my @named_sections;
+    open FILE, "<$file";
+    while (<FILE>) {
+        chomp;
+        my ($a, $b, $c, $d, $s) = split /\|/;
+        push @named_sections, $s unless grep {$_ eq $s} @named_sections;
+    }
+    close FILE;
+    my @sorted_named_sections = sort {lc $a cmp lc $b} @named_sections;
+
+    # build the corresponding array of named sections chosen by the user.
+    if ($sect) {
+        my @bits = split /,/, $section;
+        foreach my $bit (@bits) {
+            if ($bit =~ /-/) {
+                my ($low, $high) = split /-/, $bit;
+                for (my $i=$low; $i <= $high; ++$i) {
+                    push @sections, $sorted_named_sections[$i-1];
+                }
+            } else {
+                push @sections, $sorted_named_sections[$bit-1];
+            }
+        }
     }
 
-    # get that line
-    my $line;
-    open FILE, "<$wordlist";
+    # find all words specified by those sections.
+    open FILE, "<$file";
     while (<FILE>) {
-        if ($. >= $random) {
-            chomp;
-            $line = $_;
-            last;
+        chomp;
+        my ($simplified, $traditional, $pinyin, $english, $section) = split /\|/;
+        if ($sect) {
+            push @selection,
+                [$simplified, $traditional, $pinyin, $english, $section]
+                    if grep {$_ eq $section} @sections;
+        } else {
+            push @selection,
+                [$simplified, $traditional, $pinyin, $english, $section];
         }
     }
     close FILE;
-    return ($line, $random);
-}
 
-sub get_response {
-    my ($chars, $pinyin, $english, $hist_str, $mes,
-        $chinese_mode, $english_mode, $coin_toss) = @_;
-    my ($response, $resp_piny, $resp_engl,
-        $before_line, $after_line, $command);
-
-    # determine before and after lines to be printed.
-    if ($character_mode) {
-        $before_line = "$chars $hist_str $mes\n";
-        $after_line = "$pinyin $english";
-    } elsif ($chinese_mode or (!$english_mode and $coin_toss)) {
-        $before_line = "$chars $pinyin $hist_str $mes\n";
-        $after_line = $english;
-    } elsif ($english_mode or (!$chinese_mode and !$coin_toss)) {
-        $before_line = "$english $hist_str $mes\n";
-        $after_line = "$chars $pinyin";
-    }
-
-    # print these, but handle character_mode differently (for now..).
-    while (!defined $response) {
-        print $before_line;
-        print 'ANSWER> ';
-        $response = <STDIN>;
-        chomp($response);
-        process_command(\$response);
-    }
- 
-    if ($character_mode) {
-        ($resp_piny, $resp_engl) = break_up_response($response, $pinyin);
-        lookup_chars($chars);
-    }
-    print $after_line;
+    # return them in random order.
+    return shuffle(@selection);
 }
 
 sub list_sections {
-
-    # build sections.
+    my $mode = shift;
     my @sections;
-    open FILE, "<$wordlist";
+
+    my $file = $mode eq 'grammar' ? $grammar : $wordlist;
+    open FILE, "<$file";
     while (<FILE>) {
         chomp;
-        my ($a, $b, $c, $s) = split /\|/;
-        push @sections, $s unless grep { $_ eq $s } @sections;
+        my ($a, $b, $c, $d, $s) = split /\|/;
+        push @sections, $s unless grep {$_ eq $s} @sections;
     }
     close FILE;
 
-    # sorted.
-    my @sorted = sort @sections;
+    my @sorted = sort {lc $a cmp lc $b} @sections;
 
-    # print with numbers.
-    for (my $i=0; $i <= $#sorted; ++$i) {
-        print "$i. ", $sorted[$i], "\n";
+    for (my $i=1; $i <= $#sorted + 1; ++$i) {
+        print "$i. ", $sorted[$i-1], "\n";
     }
 
-    exit;
-}
-
-sub list_words {
-    my ($start_at, $finish_at, $register) = @_;
-    open FILE, "<$wordlist";
-    while (<FILE>) {
-        chomp;
-        next if $. < $start_at;
-        last if $. > $finish_at;
-        my ($char, $pinyin, $english, $section) = split /\|/;
-        next if check_register("$char $pinyin --> $english", $register, 'check_only');
-        printf "%-5s %-10s %-20s\n", $char, $pinyin, $english;
-    }
-    close FILE;
     exit;
 }
 
@@ -463,177 +241,107 @@ sub lookup_chars {
             print "\n";
         }
         close FILE;
-        print "\n";
     }
 }
 
 sub on_exit {
-    !$got_to_main and exit;
-    my $now = localtime(time);
-    open LOG, ">>$logfile";
+    my $average_correct = ($total_correct / $presented) * 100;
     $average_correct =~ s/^(.*\.\d\d).*$/$1/;
-    $average_time =~ s/^(.*\.\d\d).*$/$1/;
-    print "attempted $attempted, correct $correct ($average_correct %), average time $average_time seconds.\n";
-    print LOG "$now: attempted $attempted, correct $correct ($average_correct %), average time $average_time seconds.\n";
-    foreach my $word (@incorrect) {
-        print LOG "  $word\n";
-    }
-    close LOG;
+    print "attempted $presented, correct $total_correct ($average_correct %)\n";
     exit 0;
 }
 
-sub pinyin_compare {
-    my ($response, $pinyin) = @_;
-    $response ||= '';
-    chomp $response;
-    if ($response !~ /[a-zA-Z']/) {
-        return 0;
-    }
-    foreach my $i ('á', 'ā', 'ǎ', 'à') {
-        $pinyin =~ s/$i/a/g;
-    }
-    foreach my $i ('è', 'é', 'ē', 'ě') {
-        $pinyin =~ s/$i/e/g;
-    }
-    foreach my $i ('í', 'ī', 'ì', 'ǐ') {
-        $pinyin =~ s/$i/i/g;
-    }
-    foreach my $i ('ò', 'ō', 'ó', 'ǒ') {
-        $pinyin =~ s/$i/o/g;
-    }
-    foreach my $i ('ū', 'ù', 'ǔ', 'ú') {
-        $pinyin =~ s/$i/u/g;
-    }
-    foreach my $i ('ǚ', 'ǜ', 'ǘ') {
-        $pinyin =~ s/$i/v/g;
-    }
-    if ($pinyin =~ /\b$response\b/i) {
-        return 1;
-    } else {
-        return 0;
+sub process_command {
+    my $command = shift;
+    if ($$command =~ /^LK/) {
+        chomp $$command;
+        my ($word) = ($$command =~ /LK +(.*)/);
+        system("awk -F'\|' '{print \"  \"\$1\"   \"\$2\"   \"\$3}' $wordlist |grep --color=auto '$word'");
+        print "\n";
+        $$command = undef; # signals calling function that response contained a command.
+    } elsif ($$command =~ /^CR/) {
+        chomp $$command;
+        my ($word) = ($$command =~ /CR +(.*)/);
+        system("grep -w '$word' $characters |grep --color=auto '^.*$word'");
+        print "\n";
+        $$command = undef;
+    } elsif ($$command =~ /^PR/) {
+        print "\n";
+        $$command = undef;
     }
 }
 
-sub process_dups {
-    my %dups = ();
-    open FILE, "<$wordlist";
-    while (<FILE>) {
-        chomp;
-        my ($char, $pinyin, $english, $section) = split /\|/;
-        $section ||= '';
-        push @{ $dups{"$char|$pinyin"} }, "$.|$section";
+sub process_options {
+    my $default = shift;
+    my %mode = %{ $default };
+    my $section = 0;
+    my ($help, $list_mode,
+        $chinese_mode, $english_mode, $grammar_mode,
+        $threshold, $skip);
+    GetOptions(
+        'help|h' => \$help,
+        'section|s=s' => \$section,
+        'list|L' => \$list_mode,
+        'chinese|C' => \$chinese_mode,
+        'english|e' => \$english_mode,
+        'grammar|G' => \$grammar_mode,
+        'threshold|T=s' => \$threshold,
+        'skip|K=s' => \$skip,
+    );
+    usage() if $help;
+    if (($chinese_mode and $english_mode) or
+        ($chinese_mode and $grammar_mode) or
+        ($english_mode and $grammar_mode)) {
+        print "incompatible use of modes\n";
+        usage();
     }
-    close FILE;
-    my $f = 0;
-    foreach my $key (keys %dups) {
-        if ($#{ $dups{$key} } > 0) {
-            if (!$f) {
-                print "DUPLICATES FOUND:\n";
-                ++$f;
-            }
-            foreach my $el (@{ $dups{$key} }) {
-                my ($char, $pinyin) = split /\|/, $key;
-                my ($line, $section) = split /\|/, $el;
-                print "$line:$char|$pinyin|$section\n";
-            }
-        }
-    }
-    $f = 0;
-    foreach my $key (keys %dups) {
-        foreach my $el (@{ $dups{$key} }) {
-            my ($char, $pinyin) = split /\|/, $key;
-            my ($line, $section) = split /\|/, $el;
-            if (!$section) {
-                if (!$f) {
-                    print "MISSING SECTIONS FOUND:\n";
-                    ++$f;
-                }
-                print "$line:$char|$pinyin\n";
-            }
-        }
-    }
-    exit;
-}
-
-sub process_section {
-    my ($lines, $section_number) = @_;
-    $section_number ||= '';
-    my $section_length = $lines;
-
-    # choose section.
-    my @sections;
-    open FILE, "<$wordlist";
-    while (<FILE>) {
-        chomp;
-        my ($a, $b, $c, $s) = split /\|/;
-        push @sections, $s unless grep { $_ eq $s } @sections;
-    }
-    close FILE;
-
-    # sorted.
-    my @sorted = sort @sections;
-    
-    # print a selection.
-    unless ($section_number) {
-        for (my $i=0; $i <= $#sorted; ++$i) {
-            print "$i. ", $sorted[$i], "\n";
-        }
-        print 'SELECTION> ';
-        $section_number = <STDIN>;
-    }
-    my ($start_section, $finish_section);
-    if ($section_number =~ /-/) {
-        my ($start_number, $finish_number) = split /-/, $section_number;
-        $start_section = $sorted[$start_number];
-        $finish_section = $sorted[$finish_number];
-    } else {
-        $start_section = $sorted[$section_number];
-        $finish_section = $sorted[$section_number];
-    }
-    usage() if (!$start_section or !$finish_section);
-
-    # find $start_at and $finish_at
-    my $f = 0;
-    my $g = 0;
-    open FILE, "<$wordlist";
-    while (my $line = <FILE>) {
-        if ($line =~ /\|.*\|.*\|.*$start_section$/ and !$f) {
-            ++$f;
-            $start_at = $.;
-        }
-        if ($f and $line =~ /\|.*\|.*\|.*$finish_section$/ and !$g) {
-            ++$g;
-        }
-        if ($g and $line !~ /\|.*\|.*\|.*$finish_section$/) {
-            $finish_at = $. - 1;
-            last;
-        }
-    }
-    close FILE;
-    $section_length = $finish_at - $start_at;
-    return ($section, $section_length, $start_at, $finish_at);
+    $mode{'mode'} = 'grammar' if $grammar_mode;
+    $mode{'selection'} = 'chinese' if $chinese_mode;
+    $mode{'selection'} = 'english' if $english_mode;
+    list_sections($mode{'mode'}) if $list_mode;
+    return ($section, %mode);
 }
 
 sub update_register {
-    my ($words, $correct, $register) = @_;
+    my ($simplified, $plus_or_minus, $register) = @_;
     my $modified = 0;
     open REG, "<$register";
     open TMPREG, ">$register.tmp";
     while (<REG>) {
-        if (/^\Q$words\E/) {
+        if (/^$simplified\b/) {
             chomp;
-            print TMPREG $_, $correct, "\n";
+            print TMPREG $_, $plus_or_minus, "\n";
             ++$modified;
         } else {
             print TMPREG $_;
         }
     }
     if (!$modified) {
-        printf TMPREG "$words $correct\n";
+        printf TMPREG "${simplified}${plus_or_minus}\n";
     }
     close REG;
     close TMPREG;
     rename "$register.tmp", "$register";
+}
+
+sub usage {
+    print <<EOF;
+Usage: $0 {-h|-l|-d}
+    --help|-h      - show this help
+    --list|-L      - list sections
+
+Usage: $0
+    --chinese|-C    - chinese character mode
+    --english|-e    - english mode
+    --grammar|-G    - grammar mode
+    --threshold|-T <threshold> - set number correct threshold
+      -T 100   - only consider skipping if this word is right 100 times in a row
+      -T 1     - consider skipping if this word was right last time
+    --skip|-K <skip>           - set skip threshold
+      -K 100   - never skip a word
+      -K 0     - always skip, if threshold is met
+EOF
+    exit;
 }
 
 # end of script
