@@ -8,8 +8,9 @@ use utf8;
 binmode(STDOUT, ':utf8');
 binmode(STDIN, ':utf8');
 
-my ($chars, $pinyin, $english);
+my ($simplified, $traditional, $pinyin, $english);
 my @char_defs;
+my $found_traditional = 0;
 my $found_strokes = 0;
 my $found_pinyin = 0;
 
@@ -54,7 +55,7 @@ for (;;) {
     for (my $i=1; defined($_ = <STDIN>); ++$i) {
         if ($i == 1) {
             chomp;
-            $chars = $_;
+            $simplified = $_;
             next;
         }
         if ($i == 2) {
@@ -77,7 +78,13 @@ for (;;) {
             $english =~ s/CL: /CL:/g;
             next;
         }
-        if (defined($english)) {
+        if (defined($english) and !$found_traditional) {
+            next if /^	/;
+            chomp;
+            $traditional = $_;
+            $found_traditional = 1;
+        } 
+        if (defined($english) and $found_traditional) {
             if (/\+/) {
                 $found_strokes = 1;
                 next;
@@ -99,9 +106,9 @@ for (;;) {
     
     my $line;
     if ($#char_defs > 0) {
-        $line = "$chars|$pinyin|$english (" . join(' / ', @char_defs) . ')';
+        $line = "$simplified|$traditional|$pinyin|$english (" . join(' / ', @char_defs) . ')';
     } else {
-        $line = "$chars|$pinyin|$english";
+        $line = "$simplified|$traditional|$pinyin|$english";
     }
 
     insert_line($line, $section);
@@ -115,7 +122,7 @@ sub list_sections {
     open FILE, "<$wordlist";
     while (<FILE>) {
         chomp;
-        my ($a, $b, $c, $s) = split /\|/;
+        my ($a, $b, $c, $d, $s) = split /\|/;
         push @sections, $s unless grep { $_ eq $s } @sections;
     }
     print "$_\n" foreach (@sections);
@@ -129,7 +136,7 @@ sub insert_line {
     open TMP, ">:encoding(utf8)", "$wordlist.tmp";
     while (<FILE>) {
         chomp;
-        my ($a, $b, $c, $s) = split /\|/;
+        my ($a, $b, $c, $d, $s) = split /\|/;
         if ($s eq $section) {
             $flag = 1;
         }
@@ -158,7 +165,7 @@ sub no_such_section {
     open FILE, "<$wordlist";
     while (<FILE>) {
         chomp;
-        my ($a, $b, $c, $s) = split /\|/;
+        my ($a, $b, $c, $d, $s) = split /\|/;
         push @sections, $s unless grep { $_ eq $s } @sections;
     }
     close FILE;
