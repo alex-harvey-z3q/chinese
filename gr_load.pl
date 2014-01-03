@@ -44,27 +44,25 @@ for (;;) {
             push @piny_c, ' ';
             next;
         }
-        ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c]]);
-        $trad_c = $chars[$c] unless $trad_c;
-        if (!$piny_c) {
-            ++$c;
-            ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c-1], $chars[$c]]);
-            $trad_c = $chars[$c-1] . $chars[$c] unless $trad_c;
+        my $j=0;
+        if ($c+3 <= $#chars) { 
+            ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c], $chars[$c+1], $chars[$c+2], $chars[$c+3]]);
+            $j=3 if $piny_c;
         }
-        if (!$piny_c and ($c <= $#chars)) {
-            ++$c;
-            ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c-2], $chars[$c-1], $chars[$c]]);
-            $trad_c = $chars[$c-2] . $chars[$c-1] . $chars[$c] unless $trad_c;
+        if (!$j and $c+2 <= $#chars) { 
+            ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c], $chars[$c+1], $chars[$c+2]]);
+            $j=2 if $piny_c;
         }
-        if (!$piny_c and ($c <= $#chars)) {
-            ++$c;
-            ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c-3], $chars[$c-2], $chars[$c-1], $chars[$c]]);
-            $trad_c = $chars[$c-3] . $chars[$c-2] . $chars[$c-1] . $chars[$c] unless $trad_c;
+        if (!$j and $c+1 <= $#chars) { 
+            ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c], $chars[$c+1]]);
+            $j=1 if $piny_c;
         }
+        ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c]]) if !$j;
+        $trad_c = join('', @chars[$c..($c+$j)]) if !$trad_c;
         die "error!" if !$piny_c;
-        die "error!" if ($c > $#chars);
         push @trad, $trad_c;
         push @piny_c, $piny_c;
+        $c += $j; 
     }
 
     my $traditional = join('', @trad);
@@ -127,6 +125,8 @@ sub get_section {
 
 sub get_trad_and_pinyin {
     my $chars = shift;
+    return (undef, undef) if grep {$_ eq '？'} @{ $chars };
+    return (undef, undef) if grep {$_ eq '，'} @{ $chars };
     my ($traditional, $pinyin);
     my $chinese = 'chinese';
     my $simplified = join('', @{ $chars });
