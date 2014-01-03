@@ -17,36 +17,7 @@ my $found_pinyin = 0;
 my $wordlist = 'chinese';
 my $lastsect = 'last_section';
 
-open FILE, "<$lastsect";
-my $default_section = <FILE>;
-chomp $default_section;
-close FILE;
-
-my $section;
-print "Section? [$default_section] ";
-while ($section = <STDIN>) {
-    chomp($section);
-    if ($section eq 'list') {
-        list_sections();
-        print "\n";
-        print 'Section? ';
-    } elsif ($section eq '') {
-        $section = $default_section;
-        last;
-    } else {
-        open FILE, ">$lastsect";
-        print FILE $section;
-        close FILE;
-        last;
-    }
-}
-
-if (no_such_section($section)) {
-    print "No such section '$section'\n";
-    exit;
-} else {
-    print "Adding to section '$section'\n";
-}
+my $section = get_section($lastsect);
 
 for (;;) {
 
@@ -117,15 +88,47 @@ for (;;) {
     @char_defs = ();
 }
 
-sub list_sections {
-    my @sections = ();
-    open FILE, "<$wordlist";
-    while (<FILE>) {
-        chomp;
-        my ($a, $b, $c, $d, $s) = split /\|/;
-        push @sections, $s unless grep { $_ eq $s } @sections;
+# subroutines.
+
+sub get_section {
+    my $lastsect = shift;
+
+    # get the default section from $lastsect.
+    open FILE, "<$lastsect";
+    my $default_section = <FILE>;
+    chomp $default_section;
+    close FILE;
+
+    # ask the user for desired section.
+    print "Section? (Type 'list' to list sections.) [$default_section] ";
+
+    my $section;
+    while ($section = <STDIN>) {
+        chomp($section);
+        if ($section eq 'list') {
+            list_sections();
+            print "\n";
+            print "Section? [$default_section] ";
+        } elsif ($section) {
+            open FILE, ">$lastsect";
+            print FILE $section;
+            close FILE;
+            last;
+        } else {
+            $section = $default_section;
+            last;
+        }
     }
-    print "$_\n" foreach (@sections);
+
+    # check that the section exists.
+    if (no_such_section($section)) {
+        print "No such section '$section'\n";
+        exit;
+    } else {
+        print "Adding to section '$section'\n";
+    }
+
+    return $section;
 }
 
 sub insert_line {
@@ -157,6 +160,17 @@ sub insert_line {
     close TMP;
     close FILE;
     system("mv $wordlist.tmp $wordlist");
+}
+
+sub list_sections {
+    my @sections = ();
+    open FILE, "<$wordlist";
+    while (<FILE>) {
+        chomp;
+        my ($a, $b, $c, $d, $s) = split /\|/;
+        push @sections, $s unless grep { $_ eq $s } @sections;
+    }
+    print "$_\n" foreach (sort {lc $a cmp lc $b} @sections);
 }
 
 sub no_such_section {
