@@ -15,7 +15,7 @@ my $found_strokes = 0;
 my $found_pinyin = 0;
 
 my $wordlist = 'chinese';
-my $lastsect = 'last_section';
+my $lastsect = '.last_section';
 
 my $section = get_section($lastsect);
 

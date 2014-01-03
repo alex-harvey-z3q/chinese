@@ -14,7 +14,7 @@ binmode(STDIN, ':utf8');
 my ($simplified, $traditional, $pinyin, $english);
 
 my $wordlist = 'grammar';
-my $lastsect = 'last_section_grammar';
+my $lastsect = '.last_section_grammar';
 
 my $section = get_section($lastsect);
 
