@@ -35,23 +35,31 @@ for (;;) {
             push @trad, '？';
             push @piny_c, '?';
             next;
+        } elsif ($chars[$c] eq '，') {
+            push @trad, '，';
+            push @piny_c, ',';
+            next;
         } elsif ($chars[$c] eq ' ') {
             push @trad, ' ';
             push @piny_c, ' ';
             next;
         }
         ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c]]);
+        $trad_c = $chars[$c] unless $trad_c;
         if (!$piny_c) {
             ++$c;
             ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c-1], $chars[$c]]);
+            $trad_c = $chars[$c-1] . $chars[$c] unless $trad_c;
         }
         if (!$piny_c and ($c <= $#chars)) {
             ++$c;
             ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c-2], $chars[$c-1], $chars[$c]]);
+            $trad_c = $chars[$c-2] . $chars[$c-1] . $chars[$c] unless $trad_c;
         }
         if (!$piny_c and ($c <= $#chars)) {
             ++$c;
             ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c-3], $chars[$c-2], $chars[$c-1], $chars[$c]]);
+            $trad_c = $chars[$c-3] . $chars[$c-2] . $chars[$c-1] . $chars[$c] unless $trad_c;
         }
         die "error!" if !$piny_c;
         die "error!" if ($c > $#chars);
@@ -63,12 +71,15 @@ for (;;) {
     $traditional = ($traditional eq $simplified) ? '' : $traditional;
 
     my $pinyin = join(' ', @piny_c);
+    $pinyin =~ s/ \?/?/g;
+    $pinyin =~ s/ ,/,/g;
 
     print 'Enter English translation: ';
     my $english = <STDIN>;
     chomp $english;
 
     insert_line("$simplified|$traditional|$pinyin|$english", $section);
+    print "\n";
 }
 
 # subroutines.
@@ -129,7 +140,6 @@ sub get_trad_and_pinyin {
         }
     }
     close FILE;
-print "return ($traditional, $pinyin)\n";
     return ($traditional, $pinyin);
 }
 
