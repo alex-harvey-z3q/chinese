@@ -70,99 +70,116 @@ sub ask_questions {
     my $length_of_selection = $#{ $s };
     my %mode = %{ $m };
     for (my $i=0; $i <= $length_of_selection; ++$i) {
+
+        # get the question data from @selection structure.
         my ($simplified, $traditional, $pinyin, $english, $section) = @{ ${ ${ $s }[$i] }{'question'} };
+
+        # set variables.
         my $presented = $i+1;
-        my ($chinese_chars_in_question, $history_reg, $log_text);
+        my ($chinese_chars_in_question, $history_reg);
         if ($mode{'mode'} eq 'grammar') {
              $chinese_chars_in_question = $simplified;
              $history_reg = $grammar_reg;
-             $log_text = $simplified;
         } elsif ($mode{'mode'} eq 'vocabulary') {
              $chinese_chars_in_question = $traditional ? "$simplified/$traditional" : $simplified;
              $history_reg = $register;
-             $log_text = "$simplified $pinyin -> $english";
         }
-        my ($question_line, $answer_line, $response, $am_correct);
+        my ($question_line, $answer_line);
         my $chars = $traditional ? "$simplified/$traditional" : $simplified;
+        my ($status, $hist_str) = check_register($simplified, $history_reg);
         my $coin_toss = int(rand(2));
-        my $hist_str = get_hist($simplified, $history_reg);
-        return if check_register($log_text, $history_reg);
+
         if ($mode{'selection'} eq 'chinese' or
            ($mode{'selection'} eq 'random' and $coin_toss == 0)) {
+
             ${ ${ $s }[$i] }{'selection'} = 'C->E';
-            while (!defined $response) {
-                print "$chinese_chars_in_question [$presented of $length_of_selection] $hist_str\n";
-                print 'ANSWER> ';
-                $response = <STDIN>;
-                chomp($response);
-                process_command(\$response);
-            }
-            lookup_chars($simplified) unless $mode{'mode'} eq 'grammar';
-            print "\n";
-            print "$chars, $pinyin, $english [$section]\n";
-            $am_correct = $response ? ($english =~ /$response/) : 0;
+            $question_line = "$chinese_chars_in_question [$presented of $length_of_selection] [$hist_str]\n";
+            $answer_line = "$chars, $pinyin, $english [$section]\n";
+
         } elsif ($mode{'selection'} eq 'english' or
            ($mode{'selection'} eq 'random' and $coin_toss == 1)) {
+
             ${ ${ $s }[$i] }{'selection'} = 'E->C';
-            while (!defined $response) {
-                print "$english [$presented of $length_of_selection] $hist_str\n";
-                print 'ANSWER> ';
-                $response = <STDIN>;
-                chomp($response);
-                process_command(\$response);
-            }
-            print "\n";
-            print "$chars, $pinyin [$section]\n";
-            $am_correct = $response ? ($response eq $simplified) : 0;
+            $question_line = "$english [$presented of $length_of_selection] [$hist_str]\n";
+            $answer_line = "$chars, $pinyin [$section]\n";
         }
-        print "\n";
-        my $plus_or_minus = $am_correct ? '+' : '-';
-        print $am_correct ? "CORRECT\n" : "INCORRECT\n";
+
+        # check the register and drop out here for words we already know.
+        if (!$status) {
+            print color('cyan'), "    $hist_str:$chars, $pinyin, $english\n", color('reset');
+            next;
+        }
+
+        # get a response from the user.
+        my $response;
+        while (!defined $response) {
+            print $question_line;
+            print 'ANSWER> ';
+            $response = <STDIN>;
+            chomp($response);
+            process_command(\$response);
+        }
+
+        # save the response in the @selection structure.
         ${ ${ $s }[$i] }{'response'} = $response;
+
+        # if appropriate, show the character breakdown from character dictionary.
+        lookup_chars($simplified)
+            if ($mode{'mode'} ne 'grammar' and
+                ($mode{'selection'} eq 'chinese' or
+                    ($mode{'selection'} eq 'random' and $coin_toss == 0)));
+        print "\n";
+
+        # show the answer.
+        print $answer_line;
+
+        # determine if the answer is correct.
+        my $am_correct = check_answer($response, $simplified, $pinyin, $english,
+            ${ ${ $s }[$i] }{'selection'}, $mode{'mode'});
+
+        print "\n";
+        print $am_correct ? "CORRECT\n" : "INCORRECT\n";
         ${ ${ $s }[$i] }{'result'} = $am_correct;
         print "\n";
-        update_register($simplified, $plus_or_minus, $history_reg);
+
+        update_register($simplified, $am_correct, $history_reg);
     }
+}
+
+sub check_answer {
+    my ($response, $simplified, $pinyin, $english, $selection, $mode) = @_;
+    my $am_correct;
+    if ($selection eq 'E->C') {
+        $am_correct = ($response eq $simplified);
+    } elsif ($selection eq 'C->E' and $mode eq 'vocabulary') {
+        my ($resp_piny, $resp_engl) = split /, /, $response;
+        $am_correct = pinyin_compare($resp_piny, $pinyin) and ($english =~ $resp_engl);
+    } elsif ($selection eq 'C->E' and $mode eq 'grammar') {
+        $response =~ s/  */ /g;
+        $am_correct = ($response eq $english);
+    }
+    return $am_correct;
 }
 
 sub check_register {
-    my ($words, $register, $check_only) = @_;
-    $check_only ||= '';
-    my $status = 0;
-    open REG, "<$register";
-    while (<REG>) {
-        chomp;
-        if (/^\Q$words\E/ and /\+{$threshold}$/) {
-            if ($check_only) {
-                $status = 1;
-            } else {
-                my $random = int(rand(100)) + 1;
-                if ($random > $skip) {
-                    $status = 1;
-                    my ($word, $hist) = /^(.*) ([+-]+)$/;
-                    print color('cyan'), "    [$word] [$hist]\n", color('reset');
-                }
-            }
-        }
-    }
-    close REG;
-    return $status;
-}
-
-sub get_hist {
     my ($simplified, $register) = @_;
-    my $str = '';
-    open REG, "<$register" or die "open: $register: $!";
-    while (<REG>) {
+    my $status = 0;
+    my $hist_str = '';
+    open FILE, "<$register";
+    while (<FILE>) {
         chomp;
         if (/^$simplified/) {
             s/^$simplified//;
-            $str = $_;
+            $hist_str = $_;
+            if (/\+{$threshold}$/) {
+                my $random = int(rand(100)) + 1;
+                ++$status if $random > $skip;
+            }
             last;
         }
     }
-    close REG;
-    return "[$str]";
+    close FILE;
+    return ($status, $hist_str);
 }
 
 sub get_selection {
@@ -269,7 +286,13 @@ sub log_results {
             my $result = ${ ${ $s }[$i] }{'result'};
             my ($simplified, $traditional, $pinyin, $english, $section) = @{ ${ ${ $s }[$i] }{'question'} };
             my $chars = $traditional ? "$simplified/$traditional" : $simplified;
-            print FILE "$chars: $response\n" if !$result;
+            if (!$result) {
+                if ($selection eq 'C->E') {
+                    print FILE "  $chars: $response (should be: $pinyin, $english)\n";
+                } elsif ($selection eq 'E->C') {
+                    print FILE "  $english: $response (should be $chars)\n"
+                }
+            }
         }
     }
 
@@ -296,6 +319,38 @@ sub lookup_chars {
             print "\n";
         }
         close FILE;
+    }
+}
+
+sub pinyin_compare {
+    my ($response, $pinyin) = @_;
+    $response ||= '';
+    chomp $response;
+    if ($response !~ /[a-zA-Z']/) {
+        return 0;
+    }
+    foreach my $i ('á', 'ā', 'ǎ', 'à') {
+        $pinyin =~ s/$i/a/g;
+    }
+    foreach my $i ('è', 'é', 'ē', 'ě') {
+        $pinyin =~ s/$i/e/g;
+    }
+    foreach my $i ('í', 'ī', 'ì', 'ǐ') {
+        $pinyin =~ s/$i/i/g;
+    }
+    foreach my $i ('ò', 'ō', 'ó', 'ǒ') {
+        $pinyin =~ s/$i/o/g;
+    }
+    foreach my $i ('ū', 'ù', 'ǔ', 'ú') {
+        $pinyin =~ s/$i/u/g;
+    }
+    foreach my $i ('ǚ', 'ǜ', 'ǘ') {
+        $pinyin =~ s/$i/v/g;
+    }
+    if ($pinyin =~ /\b$response\b/i) {
+        return 1;
+    } else {
+        return 0;
     }
 }
 
@@ -351,7 +406,8 @@ sub process_options {
 }
 
 sub update_register {
-    my ($simplified, $plus_or_minus, $register) = @_;
+    my ($simplified, $am_correct, $register) = @_;
+    my $plus_or_minus = $am_correct ? '+' : '-';
     my $modified = 0;
     open REG, "<$register";
     open TMPREG, ">$register.tmp";
