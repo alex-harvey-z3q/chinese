@@ -20,6 +20,7 @@ my $logfile = 'chinese.log';
 my $characters = 'characters';
 my $grammar = 'grammar';
 my $grammar_reg = 'grammar.reg';
+my $rules = 'rules';
 
 my $threshold = 5;
 my $skip = 20;
@@ -235,6 +236,19 @@ sub get_selection {
     return shuffle(@selection);
 }
 
+sub grammar_lookup {
+    my $section = shift;
+    open FILE, "<$rules";
+    while (<FILE>) {
+        my ($sect, $lesson) = split /\|/;
+        if ($sect eq $section) {
+            $lesson =~ s/"/\\"/g;
+            eval "print \"$lesson\";";
+        }
+    }
+    close FILE;
+}
+
 sub list_sections {
     my $mode = shift;
     my @sections;
@@ -253,8 +267,6 @@ sub list_sections {
     for (my $i=1; $i <= $#sorted + 1; ++$i) {
         print "$i. ", $sorted[$i-1], "\n";
     }
-
-    exit;
 }
 
 sub log_results {
@@ -371,6 +383,16 @@ sub process_command {
     } elsif ($$command =~ /^PR/) {
         print "\n";
         $$command = undef;
+    } elsif ($$command =~ /^LS/) {
+        print "\n";
+        list_sections('grammar');
+        $$command = undef;
+    } elsif ($$command =~ /^GL/) {
+        print "\n";
+        my ($section) = ($$command =~ /GL +(.*)/);
+        grammar_lookup($section);
+        print "\n";
+        $$command = undef;
     }
 }
 
@@ -401,7 +423,7 @@ sub process_options {
     $mode{'mode'} = 'grammar' if $grammar_mode;
     $mode{'selection'} = 'chinese' if $chinese_mode;
     $mode{'selection'} = 'english' if $english_mode;
-    list_sections($mode{'mode'}) if $list_mode;
+    list_sections($mode{'mode'}) and exit if $list_mode;
     return ($section, %mode);
 }
 
