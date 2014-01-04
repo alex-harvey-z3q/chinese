@@ -11,9 +11,12 @@ binmode(STDIN, ':utf8');
 use Getopt::Long qw(:config no_ignore_case);
 use Term::ANSIColor;
 use List::Util 'shuffle';
+use Data::Dumper;
 
+# global constants.
 my $wordlist = 'chinese';
 my $register = 'chinese.reg';
+my $logfile = 'chinese.log';
 my $characters = 'characters';
 my $grammar = 'grammar';
 my $grammar_reg = 'grammar.reg';
@@ -21,90 +24,105 @@ my $grammar_reg = 'grammar.reg';
 my $threshold = 5;
 my $skip = 20;
 
-my ($section, %mode) = process_options({
-    'mode' => 'vocabulary', 'selection' => 'random'});
-
 # seed the randomiser.
 srand;
 
-# process $choose_section.
-my @selection = get_selection($section, $mode{'mode'});
-my $length_of_selection = $#selection + 1;
-
-# main loop.
-my $total_correct = 0;
-my $presented = 1;
-
+# handle CTRL-C.
 $SIG{INT} = \&on_exit;
 
-foreach my $q (@selection) {
+my $date = localtime(time);
+my ($section, %mode) = process_options({
+    'mode' => 'vocabulary', 'selection' => 'random'});
 
-    # ask a question.
-    my $am_correct = ask_a_question($q, \%mode, $presented, $length_of_selection);
+##
+## main section.
+##
 
-    # total correct.
-    $total_correct += $am_correct;
+my @selection = get_selection($section, \%mode);
 
-    ++$presented;
-}
+#[
+#  {
+#    'question' => [ '纸', '帋', 'zhǐ' 'paper, classifier for documents ...', 'Rapid Chinese' ],
+#    'response' => 'paper',
+#    'selection' => 'C->E',
+#    'result' => 1
+#  },
+#  {
+#     'question' => [ '多少', '', 'duōshao', 'how much, how many, ...', 'Rapid Chinese' ],
+#  },
+#]
+
+ask_questions(\@selection, \%mode);
 
 on_exit();
 
+sub on_exit {
+    log_results(\@selection, \%mode, $date, $logfile);
+    exit 0;
+}
+
 ##
-## subroutines
+## subroutines.
 ##
 
-sub ask_a_question {
-    my ($q, $m, $presented, $length_of_selection) = @_;
-    my ($simplified, $traditional, $pinyin, $english, $section) = @$q;
+sub ask_questions {
+    my ($s, $m) = @_;
+    my $length_of_selection = $#{ $s };
     my %mode = %{ $m };
-    my ($chinese_chars_in_question, $history_reg, $log_text);
-    if ($mode{'mode'} eq 'grammar') {
-         $chinese_chars_in_question = $simplified;
-         $history_reg = $grammar_reg;
-         $log_text = $simplified;
-    } elsif ($mode{'mode'} eq 'vocabulary') {
-         $chinese_chars_in_question = "$simplified/$traditional";
-         $history_reg = $register;
-         $log_text = "$simplified $pinyin -> $english";
-    }
-    my ($question_line, $answer_line, $response, $am_correct);
-    my $chars = $traditional ? "$simplified/$traditional" : $simplified;
-    my $coin_toss = int(rand(2));
-    my $hist_str = get_hist($simplified, $history_reg);
-    return if check_register($log_text, $history_reg);
-    if ($mode{'selection'} eq 'chinese' or
-       ($mode{'selection'} eq 'random' and $coin_toss == 0)) {
-        while (!defined $response) {
-            print "$chinese_chars_in_question [$presented of $length_of_selection] $hist_str\n";
-            print 'ANSWER> ';
-            $response = <STDIN>;
-            chomp($response);
-            process_command(\$response);
+    for (my $i=0; $i <= $length_of_selection; ++$i) {
+        my ($simplified, $traditional, $pinyin, $english, $section) = @{ ${ ${ $s }[$i] }{'question'} };
+        my $presented = $i+1;
+        my ($chinese_chars_in_question, $history_reg, $log_text);
+        if ($mode{'mode'} eq 'grammar') {
+             $chinese_chars_in_question = $simplified;
+             $history_reg = $grammar_reg;
+             $log_text = $simplified;
+        } elsif ($mode{'mode'} eq 'vocabulary') {
+             $chinese_chars_in_question = $traditional ? "$simplified/$traditional" : $simplified;
+             $history_reg = $register;
+             $log_text = "$simplified $pinyin -> $english";
         }
-        lookup_chars($simplified) unless $mode{'mode'} eq 'grammar';
-        print "\n";
-        print "$chars, $pinyin, $english [$section]\n";
-        $am_correct = $response ? ($english =~ /$response/) : 0;
-    } elsif ($mode{'selection'} eq 'english' or
-       ($mode{'selection'} eq 'random' and $coin_toss == 1)) {
-        while (!defined $response) {
-            print "$english [$presented of $length_of_selection] $hist_str\n";
-            print 'ANSWER> ';
-            $response = <STDIN>;
-            chomp($response);
-            process_command(\$response);
+        my ($question_line, $answer_line, $response, $am_correct);
+        my $chars = $traditional ? "$simplified/$traditional" : $simplified;
+        my $coin_toss = int(rand(2));
+        my $hist_str = get_hist($simplified, $history_reg);
+        return if check_register($log_text, $history_reg);
+        if ($mode{'selection'} eq 'chinese' or
+           ($mode{'selection'} eq 'random' and $coin_toss == 0)) {
+            ${ ${ $s }[$i] }{'selection'} = 'C->E';
+            while (!defined $response) {
+                print "$chinese_chars_in_question [$presented of $length_of_selection] $hist_str\n";
+                print 'ANSWER> ';
+                $response = <STDIN>;
+                chomp($response);
+                process_command(\$response);
+            }
+            lookup_chars($simplified) unless $mode{'mode'} eq 'grammar';
+            print "\n";
+            print "$chars, $pinyin, $english [$section]\n";
+            $am_correct = $response ? ($english =~ /$response/) : 0;
+        } elsif ($mode{'selection'} eq 'english' or
+           ($mode{'selection'} eq 'random' and $coin_toss == 1)) {
+            ${ ${ $s }[$i] }{'selection'} = 'E->C';
+            while (!defined $response) {
+                print "$english [$presented of $length_of_selection] $hist_str\n";
+                print 'ANSWER> ';
+                $response = <STDIN>;
+                chomp($response);
+                process_command(\$response);
+            }
+            print "\n";
+            print "$chars, $pinyin [$section]\n";
+            $am_correct = $response ? ($response eq $simplified) : 0;
         }
         print "\n";
-        print "$chars, $pinyin [$section]\n";
-        $am_correct = $response ? ($response eq $simplified) : 0;
+        my $plus_or_minus = $am_correct ? '+' : '-';
+        print $am_correct ? "CORRECT\n" : "INCORRECT\n";
+        ${ ${ $s }[$i] }{'response'} = $response;
+        ${ ${ $s }[$i] }{'result'} = $am_correct;
+        print "\n";
+        update_register($simplified, $plus_or_minus, $history_reg);
     }
-    print "\n";
-    my $plus_or_minus = $am_correct ? '+' : '-';
-    print $am_correct ? "CORRECT\n" : "INCORRECT\n";
-    print "\n";
-    update_register($simplified, $plus_or_minus, $history_reg);
-    return $am_correct;
 }
 
 sub check_register {
@@ -148,11 +166,11 @@ sub get_hist {
 }
 
 sub get_selection {
-    my ($sect, $mode) = @_;
+    my ($sect, $m) = @_;
     my @sections;
     my @seen_sections;
     my @selection;
-    my $file = $mode eq 'grammar' ? $grammar : $wordlist;
+    my $file = ${ $m }{'mode'} eq 'grammar' ? $grammar : $wordlist;
 
     # build an array of alphabetically sorted sections.
     my @named_sections;
@@ -187,11 +205,11 @@ sub get_selection {
         my ($simplified, $traditional, $pinyin, $english, $section) = split /\|/;
         if ($sect) {
             push @selection,
-                [$simplified, $traditional, $pinyin, $english, $section]
+                {'question' => [$simplified, $traditional, $pinyin, $english, $section]}
                     if grep {$_ eq $section} @sections;
         } else {
             push @selection,
-                [$simplified, $traditional, $pinyin, $english, $section];
+                {'question' => [$simplified, $traditional, $pinyin, $english, $section]};
         }
     }
     close FILE;
@@ -222,6 +240,43 @@ sub list_sections {
     exit;
 }
 
+sub log_results {
+    my ($s, $m, $date, $logfile) = @_;
+    my $length_of_selection = $#{ $s };
+    my %mode = %{ $m };
+
+    # open logfile.
+    open FILE, ">>$logfile";
+    print FILE "$date:\n";
+
+    # calculate number correct.
+    my $presented = 0;
+    my $total_correct = 0;
+    for (my $i=0; $i <= $length_of_selection; ++$i) {
+        ++$presented if (exists ${ ${ $s }[$i] }{'selection'});
+        ++$total_correct if (${ ${ $s }[$i] }{'response'});
+    }
+    my $average_correct = ($total_correct / $presented) * 100;
+    $average_correct =~ s/^(.*\.\d\d).*$/$1/;
+    print "attempted $presented, correct $total_correct ($average_correct %)\n";
+    print FILE "attempted $presented, correct $total_correct ($average_correct %)\n";
+
+    # log results.
+    for (my $i=0; $i <= $length_of_selection; ++$i) {
+        if (exists ${ ${ $s }[$i] }{'response'}) {
+            my $selection = ${ ${ $s }[$i] }{'selection'};
+            my $response = ${ ${ $s }[$i] }{'response'};
+            my $result = ${ ${ $s }[$i] }{'result'};
+            my ($simplified, $traditional, $pinyin, $english, $section) = @{ ${ ${ $s }[$i] }{'question'} };
+            my $chars = $traditional ? "$simplified/$traditional" : $simplified;
+            print FILE "$chars: $response\n" if !$result;
+        }
+    }
+
+    # close logfile.
+    close FILE;
+}
+
 sub lookup_chars {
     my $chars = shift;
     my @chars = split '', $chars;
@@ -244,13 +299,6 @@ sub lookup_chars {
     }
 }
 
-sub on_exit {
-    my $average_correct = ($total_correct / $presented) * 100;
-    $average_correct =~ s/^(.*\.\d\d).*$/$1/;
-    print "attempted $presented, correct $total_correct ($average_correct %)\n";
-    exit 0;
-}
-
 sub process_command {
     my $command = shift;
     if ($$command =~ /^LK/) {
@@ -258,7 +306,7 @@ sub process_command {
         my ($word) = ($$command =~ /LK +(.*)/);
         system("awk -F'\|' '{print \"  \"\$1\"   \"\$2\"   \"\$3}' $wordlist |grep --color=auto '$word'");
         print "\n";
-        $$command = undef; # signals calling function that response contained a command.
+        $$command = undef; # tells calling function that response contained a command.
     } elsif ($$command =~ /^CR/) {
         chomp $$command;
         my ($word) = ($$command =~ /CR +(.*)/);
