@@ -5,16 +5,23 @@ use warnings;
 
 my $wordlist = 'chinese';
 my $grammar = 'grammar';
+my $chinese_reg = 'chinese.reg';
+my $grammar_reg = 'grammar.reg';
 
 my %dups = ();
 
-foreach my $file ($wordlist, $grammar) {
+foreach my $file ($wordlist, $grammar, $chinese_reg, $grammar_reg) {
     open FILE, "<$file";
     while (<FILE>) {
         chomp;
-        my ($simplified, $traditional, $pinyin, $english, $section) = split /\|/;
-        $section ||= '';
-        push @{ $dups{"$simplified|$traditional|$pinyin"} }, "$.|$file|$section";
+        if (/\|/) {
+            my ($simplified, $traditional, $pinyin, $english, $section) = split /\|/;
+            $section ||= '';
+            push @{ $dups{"$simplified|$file"} }, "$file:$.:$simplified|$traditional|$pinyin|$english|$section";
+        } else {
+            my ($simplified, $plus_and_minuses) = /^([^-\+]*)([-\+]+)$/;
+            push @{ $dups{"$simplified|$file"} }, "$plus_and_minuses $file:$.";
+        }
     }
     close FILE;
 }
@@ -27,9 +34,9 @@ foreach my $key (keys %dups) {
             ++$f;
         }
         foreach my $el (@{ $dups{$key} }) {
-            my ($simplified, $traditional, $pinyin) = split /\|/, $key;
-            my ($line, $section) = split /\|/, $el;
-            print "$line:$simplified|$traditional|$pinyin|$section\n";
+            my $key_mod = $key;
+            $key_mod =~ s/\|.*//;
+            print "$key_mod|$el\n";
         }
     }
 }
@@ -37,14 +44,15 @@ foreach my $key (keys %dups) {
 $f = 0;
 foreach my $key (keys %dups) {
     foreach my $el (@{ $dups{$key} }) {
-        my ($simplified, $traditional, $pinyin) = split /\|/, $key;
-        my ($line, $file, $section) = split /\|/, $el;
+        next if $key =~ /chinese.reg/;
+        next if $key =~ /grammar.reg/;
+        my ($stuff, $section) = ($el =~ /^(.*:.*:.*\|.*\|.*\|.*)\|(.*)$/);
         if (!$section) {
             if (!$f) {
                 print "MISSING SECTIONS FOUND:\n";
                 ++$f;
             }
-            print "$line:$simplified|$traditional|$pinyin\n";
+            print "$el\n";
         }
     }
 }
