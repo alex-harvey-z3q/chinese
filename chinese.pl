@@ -163,7 +163,7 @@ sub check_answer {
 
 sub check_register {
     my ($simplified, $register) = @_;
-    my $status = 0;
+    my $status = 1;
     my $hist_str = '';
     open FILE, "<$register";
     while (<FILE>) {
@@ -173,7 +173,7 @@ sub check_register {
             $hist_str = $_;
             if (/\+{$threshold}$/) {
                 my $random = int(rand(100)) + 1;
-                ++$status if $random > $skip;
+                $status = 0 if $random > $skip;
             }
             last;
         }
