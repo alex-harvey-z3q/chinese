@@ -59,7 +59,7 @@ for (;;) {
         }
         ($trad_c, $piny_c) = get_trad_and_pinyin([$chars[$c]]) if !$j;
         $trad_c = join('', @chars[$c..($c+$j)]) if !$trad_c;
-        die "error!" if !$piny_c;
+        print "error loading at '$chars[$c]'!\n" and die if !$piny_c;
         push @trad, $trad_c;
         push @piny_c, $piny_c;
         $c += $j; 
