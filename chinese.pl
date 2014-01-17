@@ -183,6 +183,16 @@ sub check_register {
     return ($status, $hist_str);
 }
 
+sub command_help {
+    print <<EOF;
+LK <word> - look up <word> in the word dictionary
+CR <word> - look up <word> in the character dictionary
+PR        - print the question again
+LS        - list all grammar sections
+GL <sect> - print the grammar lesson relating to <sect>; use LS to get <sect>
+EOF
+}
+
 sub get_selection {
     my ($sect, $m) = @_;
     my @sections;
@@ -368,7 +378,10 @@ sub pinyin_compare {
 
 sub process_command {
     my $command = shift;
-    if ($$command =~ /^LK/) {
+    if ($$command =~ /^HELP/) {
+        command_help();
+        $$command = undef;
+    } elsif ($$command =~ /^LK/) {
         chomp $$command;
         my ($word) = ($$command =~ /LK +(.*)/);
         system("awk -F'\|' '{print \"  \"\$1\"   \"\$2\"   \"\$3}' $wordlist |grep --color=auto '$word'");
