@@ -20,7 +20,7 @@ my $logfile = 'chinese.log';
 my $characters = 'characters';
 my $grammar = 'grammar';
 my $grammar_reg = 'grammar.reg';
-my $rules = 'rules';
+my $lessons = 'lessons';
 
 my $threshold = 5;
 my $skip = 20;
@@ -238,7 +238,7 @@ sub get_selection {
 
 sub grammar_lookup {
     my $section = shift;
-    open FILE, "<$rules";
+    open FILE, "<$lessons";
     while (<FILE>) {
         my ($sect, $lesson) = split /\|/;
         if ($sect eq $section) {
