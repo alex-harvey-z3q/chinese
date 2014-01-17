@@ -190,6 +190,7 @@ CR <word> - look up <word> in the character dictionary
 PR        - print the question again
 LS        - list all grammar sections
 GL <sect> - print the grammar lesson relating to <sect>; use LS to get <sect>
+HELP      - show this help
 EOF
 }
 
@@ -380,6 +381,7 @@ sub process_command {
     my $command = shift;
     if ($$command =~ /^HELP/) {
         command_help();
+        print "\n";
         $$command = undef;
     } elsif ($$command =~ /^LK/) {
         chomp $$command;
@@ -399,6 +401,7 @@ sub process_command {
     } elsif ($$command =~ /^LS/) {
         print "\n";
         list_sections('grammar');
+        print "\n";
         $$command = undef;
     } elsif ($$command =~ /^GL/) {
         print "\n";
