@@ -11,7 +11,6 @@ binmode(STDIN, ':utf8');
 use Getopt::Long qw(:config no_ignore_case);
 use Term::ANSIColor;
 use List::Util 'shuffle';
-use Data::Dumper;
 
 # global constants.
 my $wordlist = 'chinese';
