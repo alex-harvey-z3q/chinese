@@ -152,8 +152,8 @@ sub check_answer {
     if ($selection eq 'E->C') {
         $am_correct = ($response eq $simplified);
     } elsif ($selection eq 'C->E' and $mode eq 'vocabulary') {
-        my ($resp_piny, $resp_engl) = split /, /, $response;
-        $am_correct = pinyin_compare($resp_piny, $pinyin) and ($english =~ $resp_engl);
+        my ($resp_piny, $resp_engl) = split /, */, $response;
+        $am_correct = pinyin_compare($resp_piny, $pinyin) && ($english =~ $resp_engl);
     } elsif ($selection eq 'C->E' and $mode eq 'grammar') {
         $response =~ s/  */ /g;
         $am_correct = ($response eq $english);
@@ -481,6 +481,10 @@ Usage: $0
     --skip|-K <skip>           - set skip threshold
       -K 100   - never skip a word
       -K 0     - always skip, if threshold is met
+
+Answers to Chinese questions are expected to be comma-separated, e.g.
+Question: 什么
+Answer: shenme, what
 EOF
     exit;
 }
