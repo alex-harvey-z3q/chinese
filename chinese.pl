@@ -189,7 +189,7 @@ CR <word> - look up <word> in the character dictionary
 PR        - print the question again
 LS        - list all grammar sections
 GL <sect> - print the grammar lesson relating to <sect>; use LS to get <sect>
-HELP      - show this help
+?/HELP    - show this help
 EOF
 }
 
@@ -378,7 +378,7 @@ sub pinyin_compare {
 
 sub process_command {
     my $command = shift;
-    if ($$command =~ /^HELP/) {
+    if ($$command =~ /^HELP/ || $$command eq '?') {
         command_help();
         print "\n";
         $$command = undef;
