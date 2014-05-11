@@ -42,7 +42,7 @@ my @selection = get_selection($section, \%mode);
 
 #[
 #  {
-#    'question' => [ '纸', '帋', 'zhǐ' 'paper, classifier for documents ...', 'Rapid Chinese' ],
+#    'question' => [ '纸', '帋', 'zhǐ' 'paper...', 'Rapid Chinese' ],
 #    'response' => 'paper',
 #    'selection' => 'C->E',
 #    'result' => 1
@@ -153,7 +153,7 @@ sub check_answer {
         $am_correct = ($response eq $simplified);
     } elsif ($selection eq 'C->E' and $mode eq 'vocabulary') {
         my ($resp_piny, $resp_engl) = split /, */, $response;
-        $am_correct = pinyin_compare($resp_piny, $pinyin) && ($english =~ $resp_engl);
+        $am_correct = pinyin_compare($resp_piny, $pinyin) && ($english =~ /$resp_engl/i);
     } elsif ($selection eq 'C->E' and $mode eq 'grammar') {
         $response =~ s/  */ /g;
         $am_correct = ($response eq $english);
@@ -168,7 +168,7 @@ sub check_register {
     open FILE, "<$register";
     while (<FILE>) {
         chomp;
-        if (/^$simplified/) {
+        if (/^$simplified[+-]/) {
             s/^$simplified//;
             $hist_str = $_;
             if (/\+{$threshold}$/) {
@@ -416,8 +416,9 @@ sub process_options {
     my %mode = %{ $default };
     my $section = 0;
     my ($help, $list_mode,
-        $chinese_mode, $english_mode, $grammar_mode,
-        $threshold, $skip);
+        $chinese_mode, $english_mode, $grammar_mode);
+    # note: $skip and $threshold currently implemented
+    # as global variables.
     GetOptions(
         'help|h' => \$help,
         'section|s=s' => \$section,
