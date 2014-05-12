@@ -300,19 +300,23 @@ sub log_results {
     print "attempted $presented, correct $total_correct ($average_correct %)\n";
     print FILE "attempted $presented, correct $total_correct ($average_correct %)\n";
 
-    # log results.
+    # log and print results.
     for (my $i=0; $i <= $length_of_selection; ++$i) {
         if (exists ${ ${ $s }[$i] }{'response'}) {
             my $selection = ${ ${ $s }[$i] }{'selection'};
             my $response = ${ ${ $s }[$i] }{'response'};
             my $result = ${ ${ $s }[$i] }{'result'};
             my ($simplified, $traditional, $pinyin, $english, $section) = @{ ${ ${ $s }[$i] }{'question'} };
+            my $engl_abbr = $english;
+            $engl_abbr =~ s/,.*/, .../;
             my $chars = $traditional ? "$simplified/$traditional" : $simplified;
             if (!$result) {
                 if ($selection eq 'C->E') {
-                    print FILE "  $chars: $response (should be: $pinyin, $english)\n";
+                    print FILE "  $chars: $response (should be: $pinyin, $engl_abbr)\n";
+                    print "  $chars: $response (should be: $pinyin, $engl_abbr)\n";
                 } elsif ($selection eq 'E->C') {
-                    print FILE "  $english: $response (should be $chars)\n"
+                    print FILE "  $english: $response (should be $chars)\n";
+                    print "  $english: $response (should be $chars)\n";
                 }
             }
         }
