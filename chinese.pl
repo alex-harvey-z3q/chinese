@@ -313,10 +313,10 @@ sub handle_results {
             if (!$result) {
                 if ($selection eq 'C->E') {
                     print FILE "  $chars: $response (should be: $pinyin, $engl_abbr)\n";
-                    print "  $chars: $response (should be: $pinyin, $engl_abbr)\n";
+                    print "  $chars: ($response) should be: ($pinyin, $engl_abbr)\n";
                 } elsif ($selection eq 'E->C') {
                     print FILE "  $english: $response (should be $chars)\n";
-                    print "  $english: $response (should be $chars)\n";
+                    print "  $english: ($response) should be: ($chars)\n";
                 }
             }
         }
