@@ -443,7 +443,10 @@ sub process_options {
     $mode{'mode'} = 'grammar' if $grammar_mode;
     $mode{'selection'} = 'chinese' if $chinese_mode;
     $mode{'selection'} = 'english' if $english_mode;
-    list_sections($mode{'mode'}) and exit if $list_mode;
+    if ($list_mode) {
+        list_sections($mode{'mode'});
+        exit;
+    }
     return ($section, %mode);
 }
 
