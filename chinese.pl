@@ -57,7 +57,7 @@ ask_questions(\@selection, \%mode);
 on_exit();
 
 sub on_exit {
-    log_results(\@selection, \%mode, $date, $logfile);
+    handle_results(\@selection, \%mode, $date, $logfile);
     exit 0;
 }
 
@@ -279,7 +279,7 @@ sub list_sections {
     }
 }
 
-sub log_results {
+sub handle_results {
     my ($s, $m, $date, $logfile) = @_;
     my $length_of_selection = $#{ $s };
     my %mode = %{ $m };
