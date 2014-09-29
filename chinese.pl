@@ -480,6 +480,7 @@ Usage: $0 {-h|-l|-d}
     --list|-L      - list sections
 
 Usage: $0
+    --section|-s <n-m>  - words from dictionary sections n to m
     --chinese|-C    - chinese character mode
     --english|-e    - english mode
     --grammar|-G    - grammar mode
