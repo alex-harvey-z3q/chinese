@@ -492,10 +492,20 @@ Usage: $0
       -K 100   - never skip a word
       -K 0     - always skip, if threshold is met
 
-Answers to Chinese questions are expected to be comma-separated, e.g.
+Answers to Chinese questions must take the form of toneless Pinyin followed by
+a comma followed by the English, where case doesn't matter, e.g.
 Question: 什么
 Answer: shenme, what
+
+Answers to English questions must be just the simplified Chinese, e.g.
+Question: I, me, my
+Answer: 我
+
+To access the commands help enter ? or HELP.
+
+Command help:
 EOF
+    command_help();
     exit;
 }
 
