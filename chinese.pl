@@ -68,6 +68,7 @@ sub on_exit {
 sub ask_questions {
     my ($s, $m) = @_;
     my $length_of_selection = $#{ $s };
+    my $length_of_selection_corrected = $length_of_selection + 1;
     my %mode = %{ $m };
     for (my $i=0; $i <= $length_of_selection; ++$i) {
 
@@ -93,14 +94,14 @@ sub ask_questions {
            ($mode{'selection'} eq 'random' and $coin_toss == 0)) {
 
             ${ ${ $s }[$i] }{'selection'} = 'C->E';
-            $question_line = "$chinese_chars_in_question [$presented of $length_of_selection] [$hist_str]\n";
+            $question_line = "$chinese_chars_in_question [$presented of $length_of_selection_corrected] [$hist_str]\n";
             $answer_line = "$chars, $pinyin, $english [$section]\n";
 
         } elsif ($mode{'selection'} eq 'english' or
            ($mode{'selection'} eq 'random' and $coin_toss == 1)) {
 
             ${ ${ $s }[$i] }{'selection'} = 'E->C';
-            $question_line = "$english [$presented of $length_of_selection] [$hist_str]\n";
+            $question_line = "$english [$presented of $length_of_selection_corrected] [$hist_str]\n";
             $answer_line = "$chars, $pinyin [$section]\n";
         }
 
@@ -293,7 +294,7 @@ sub handle_results {
     my $total_correct = 0;
     for (my $i=0; $i <= $length_of_selection; ++$i) {
         ++$presented if (exists ${ ${ $s }[$i] }{'selection'});
-        ++$total_correct if (${ ${ $s }[$i] }{'response'});
+        ++$total_correct if (${ ${ $s }[$i] }{'result'});
     }
     my $average_correct = ($total_correct / $presented) * 100;
     $average_correct =~ s/^(.*\.\d\d).*$/$1/;
