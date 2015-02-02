@@ -302,7 +302,7 @@ sub handle_results {
         ++$total_correct if (defined ${ ${ $s }[$i] }{'result'} and
 		                 ${ ${ $s }[$i] }{'result'} eq 1);
     }
-    my $average_correct = ($total_correct / $presented_and_not_skipped) * 100;
+    my $average_correct = $presented_and_not_skipped ? ($total_correct / $presented_and_not_skipped) * 100 : 0;
     $average_correct =~ s/^(.*\.\d\d).*$/$1/;
     print "presented $presented, attempted $presented_and_not_skipped, correct $total_correct ($average_correct %)\n";
     print FILE "presented $presented, attempted $presented_and_not_skipped, correct $total_correct ($average_correct %)\n";
