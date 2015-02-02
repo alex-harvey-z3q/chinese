@@ -45,7 +45,7 @@ my @selection = get_selection($section, \%mode);
 #    'question' => [ '纸', '帋', 'zhǐ' 'paper...', 'Rapid Chinese' ],
 #    'response' => 'paper',
 #    'selection' => 'C->E',
-#    'result' => 1
+#    'result' => 1            # result '' = incorrect, 1 = correct, 2 = skipped
 #  },
 #  {
 #     'question' => [ '多少', '', 'duōshao', 'how much, how many, ...', 'Rapid Chinese' ],
@@ -108,6 +108,7 @@ sub ask_questions {
         # check the register and drop out here for words we already know.
         if (!$status) {
             print color('cyan'), "    $hist_str:$chars, $pinyin, $english\n", color('reset');
+	    ${ ${ $s }[$i] }{'result'} = 2;
             next;
         }
 
@@ -291,15 +292,20 @@ sub handle_results {
 
     # calculate number correct.
     my $presented = 0;
+    my $presented_and_not_skipped = 0;
     my $total_correct = 0;
     for (my $i=0; $i <= $length_of_selection; ++$i) {
         ++$presented if (exists ${ ${ $s }[$i] }{'selection'});
-        ++$total_correct if (${ ${ $s }[$i] }{'result'});
+        ++$presented_and_not_skipped if (exists ${ ${ $s }[$i] }{'selection'} and
+	                                   defined ${ ${ $s }[$i] }{'result'} and
+					   ${ ${ $s }[$i] }{'result'} ne 2);
+        ++$total_correct if (defined ${ ${ $s }[$i] }{'result'} and
+		                 ${ ${ $s }[$i] }{'result'} eq 1);
     }
-    my $average_correct = ($total_correct / $presented) * 100;
+    my $average_correct = ($total_correct / $presented_and_not_skipped) * 100;
     $average_correct =~ s/^(.*\.\d\d).*$/$1/;
-    print "attempted $presented, correct $total_correct ($average_correct %)\n";
-    print FILE "attempted $presented, correct $total_correct ($average_correct %)\n";
+    print "presented $presented, attempted $presented_and_not_skipped, correct $total_correct ($average_correct %)\n";
+    print FILE "presented $presented, attempted $presented_and_not_skipped, correct $total_correct ($average_correct %)\n";
 
     # log and print results.
     for (my $i=0; $i <= $length_of_selection; ++$i) {
