@@ -291,21 +291,19 @@ sub handle_results {
     print FILE "$date:\n";
 
     # calculate number correct.
-    my $presented = 0;
-    my $presented_and_not_skipped = 0;
+    my $attempted = 0;
     my $total_correct = 0;
     for (my $i=0; $i <= $length_of_selection; ++$i) {
-        ++$presented if (exists ${ ${ $s }[$i] }{'selection'});
-        ++$presented_and_not_skipped if (exists ${ ${ $s }[$i] }{'selection'} and
-	                                   defined ${ ${ $s }[$i] }{'result'} and
-					   ${ ${ $s }[$i] }{'result'} ne 2);
+        ++$attempted if (exists ${ ${ $s }[$i] }{'selection'} and
+	                defined ${ ${ $s }[$i] }{'result'} and
+                                ${ ${ $s }[$i] }{'result'} ne 2);
         ++$total_correct if (defined ${ ${ $s }[$i] }{'result'} and
-		                 ${ ${ $s }[$i] }{'result'} eq 1);
+		                     ${ ${ $s }[$i] }{'result'} eq 1);
     }
-    my $average_correct = $presented_and_not_skipped ? ($total_correct / $presented_and_not_skipped) * 100 : 0;
+    my $average_correct = $attempted ? ($total_correct / $attempted) * 100 : 0;
     $average_correct =~ s/^(.*\.\d\d).*$/$1/;
-    print "presented $presented, attempted $presented_and_not_skipped, correct $total_correct ($average_correct %)\n";
-    print FILE "presented $presented, attempted $presented_and_not_skipped, correct $total_correct ($average_correct %)\n";
+    print "attempted $attempted, correct $total_correct ($average_correct %)\n";
+    print FILE "attempted $attempted, correct $total_correct ($average_correct %)\n";
 
     # log and print results.
     for (my $i=0; $i <= $length_of_selection; ++$i) {
