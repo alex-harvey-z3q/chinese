@@ -13,7 +13,9 @@
     set guifont=Monaco:h11
     set guifontwide=NSimsun:h12
 
-## If using putty go to Window -> Translation  and change
+## Putty
+
+If using putty go to Window -> Translation and change
 
 from:
 ISO-8859-1:1998 (Latin-1, West Europe) to
