@@ -186,7 +186,6 @@ sub command_help {
     print <<EOF;
 LK <word> - look up <word> in the word dictionary
 CR <word> - look up <word> in the character dictionary
-PR        - print the question again
 LS        - list all grammar sections
 GL <sect> - print the grammar lesson relating to <sect>; use LS to get <sect>
 ?/HELP    - show this help
@@ -401,9 +400,6 @@ sub process_command {
         chomp $$command;
         my ($word) = ($$command =~ /CR +(.*)/);
         system("grep -w '$word' $characters |grep --color=auto '^.*$word'");
-        print "\n";
-        $$command = undef;
-    } elsif ($$command =~ /^PR/) {
         print "\n";
         $$command = undef;
     } elsif ($$command =~ /^LS/) {
