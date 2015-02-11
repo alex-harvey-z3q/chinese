@@ -126,10 +126,7 @@ sub ask_questions {
         ${ ${ $s }[$i] }{'response'} = $response;
 
         # if appropriate, show the character breakdown from character dictionary.
-        lookup_chars($simplified)
-            if ($mode{'mode'} ne 'grammar' and
-                ($mode{'selection'} eq 'chinese' or
-                    ($mode{'selection'} eq 'random' and $coin_toss == 0)));
+        lookup_chars($simplified) unless $mode{'mode'} eq 'grammar';
         print "\n";
 
         # show the answer.
