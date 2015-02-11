@@ -152,7 +152,8 @@ sub check_answer {
         $am_correct = ($response eq $simplified);
     } elsif ($selection eq 'C->E' and $mode eq 'vocabulary') {
         my ($resp_piny, $resp_engl) = split /, */, $response;
-        $am_correct = pinyin_compare($resp_piny, $pinyin) && ($english =~ /$resp_engl/i);
+	$resp_engl = '' unless defined($resp_engl);
+        $am_correct = pinyin_compare($resp_piny, $pinyin) && ($english =~ /$resp_engl/i) && ($resp_engl !~ /^ *$/);
     } elsif ($selection eq 'C->E' and $mode eq 'grammar') {
         $response =~ s/  */ /g;
         $am_correct = ($response eq $english);
