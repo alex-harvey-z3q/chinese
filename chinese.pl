@@ -387,7 +387,7 @@ sub pinyin_compare {
 
 sub process_command {
     my $command = shift;
-    if ($$command =~ /^HELP/ || $$command eq '?') {
+    if ($$command =~ /^HELP/ || $$command eq '?' || $$command eq '？') {
         command_help();
         print "\n";
         $$command = undef;
