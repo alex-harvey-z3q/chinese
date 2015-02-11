@@ -355,6 +355,8 @@ sub pinyin_compare {
     my ($response, $pinyin) = @_;
     $response ||= '';
     chomp $response;
+    $response =~ s/ //g;
+    $pinyin =~ s/ //g;
     if ($response !~ /[a-zA-Z']/) {
         return 0;
     }
