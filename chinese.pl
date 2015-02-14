@@ -502,6 +502,10 @@ Answers to English questions must be just the simplified Chinese, e.g.
 Question: I, me, my
 Answer: 我
 
+In grammar mode, the pinyin is not expected before an English answer, e.g.
+Question: 很多时间
+ANSWER> a long time
+
 To access the commands help enter ? or HELP.
 
 Command help:
