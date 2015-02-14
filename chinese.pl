@@ -179,6 +179,7 @@ sub check_register {
         }
     }
     close FILE;
+    $hist_str =~ s/^.*(.{10})$/$1/;
     return ($status, $hist_str);
 }
 
