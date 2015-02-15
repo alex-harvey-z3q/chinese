@@ -37,6 +37,8 @@ for (;;) {
         }
         if ($i > 2 and !defined($english)) {
             next if /^	/;
+	    next if /^$/;
+	    next if /^  *$/;
             chomp;
             $english = $_;
             $english =~ s# /#,#g;
