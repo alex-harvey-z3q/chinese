@@ -54,7 +54,7 @@ for (;;) {
         if (defined($english) and !$found_traditional) {
             next if /^	/;
             chomp;
-            $traditional = $_;
+            $traditional = /^Character/ ? '' : $_;
             $found_traditional = 1;
         } 
         if (defined($english) and $found_traditional) {
@@ -87,6 +87,9 @@ for (;;) {
     insert_line($line, $section);
 
     undef $english;
+    $found_traditional = 0;
+    $found_strokes = 0;
+    $found_pinyin = 0;
     @char_defs = ();
 }
 
