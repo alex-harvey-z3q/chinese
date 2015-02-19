@@ -486,12 +486,17 @@ Usage: $0
     --chinese|-C    - chinese character mode
     --english|-e    - english mode
     --grammar|-G    - grammar mode
-    --threshold|-T <threshold> - set number correct threshold
+    --threshold|-T <threshold> - set number correct threshold (default 5 in a row)
       -T 100   - only consider skipping if this word is right 100 times in a row
       -T 1     - consider skipping if this word was right last time
-    --skip|-K <skip>           - set skip threshold
+    --skip|-K <skip>           - set skip threshold (default 20% chance of skipping)
       -K 100   - never skip a word
       -K 0     - always skip, if threshold is met
+
+Useful combinations of -T/-K:
+    -T 1 -K 0  - only ask questions that were incorrect on the last try, and
+                 always otherwise skip
+    -K 100     - never skip a word (all -T options have the same effect here).
 
 Answers to Chinese questions must take the form of toneless Pinyin followed by
 a comma followed by the English, where case doesn't matter, e.g.
