@@ -54,9 +54,13 @@ for (;;) {
         if (defined($english) and !$found_traditional) {
             next if /^	/;
             chomp;
-            $traditional = /^Character/ ? '' : $_;
-            $traditional = /^HSK/ ? '' : $_;
+	    if (/^Character/ or /^HSK/) {
+                $traditional = '';
+            } else {
+                $traditional = $_;
+            }
             $found_traditional = 1;
+	    print "got after $traditional and _ is $_\n";
         } 
         if (defined($english) and $found_traditional) {
             if (/\+/) {
