@@ -55,6 +55,7 @@ for (;;) {
             next if /^	/;
             chomp;
             $traditional = /^Character/ ? '' : $_;
+            $traditional = /^HSK/ ? '' : $_;
             $found_traditional = 1;
         } 
         if (defined($english) and $found_traditional) {
