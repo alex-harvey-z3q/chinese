@@ -60,7 +60,6 @@ for (;;) {
                 $traditional = $_;
             }
             $found_traditional = 1;
-	    print "got after $traditional and _ is $_\n";
         } 
         if (defined($english) and $found_traditional) {
             if (/\+/) {
