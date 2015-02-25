@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use utf8;
-
+use open ':encoding(utf8)';
 binmode(STDOUT, ':utf8');
 binmode(STDIN, ':utf8');
 
