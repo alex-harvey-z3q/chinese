@@ -37,8 +37,8 @@ for (;;) {
         }
         if ($i > 2 and !defined($english)) {
             next if /^	/;
-	    next if /^$/;
-	    next if /^  *$/;
+            next if /^$/;
+            next if /^  *$/;
             chomp;
             $english = $_;
             $english =~ s# /#,#g;
@@ -54,7 +54,7 @@ for (;;) {
         if (defined($english) and !$found_traditional) {
             next if /^	/;
             chomp;
-	    if (/^Character/ or /^HSK/) {
+            if (/^Character/ or /^HSK/) {
                 $traditional = '';
             } else {
                 $traditional = $_;
@@ -142,6 +142,7 @@ sub get_section {
 
 sub insert_line {
     my ($line, $section) = @_;
+    my ($A, $B, $C, $D, $S) = split /\|/, $line;
     my $flag = 0;
     my $printed = 0;
     open FILE, "<:encoding(utf8)", $wordlist;
@@ -153,14 +154,26 @@ sub insert_line {
             $flag = 1;
         }
         if ($flag and $s eq $section) {
+          if ($a eq $A and $b eq $B and $c eq $C and $d eq $D) {
+            print "removing $a from section $s\n";
+          } else {
             print TMP "$_\n";
+          }
         } elsif ($flag and $s ne $section) {
-            print TMP "$line|$section\n";
-            print TMP "$_\n";
+            if ($a eq $A and $b eq $B and $c eq $C and $d eq $D) {
+              print "moving $a already in section $s to end of section\n";
+            } else {
+              print TMP "$line|$section\n";
+              print TMP "$_\n";
+            }
             $flag = 0;
             $printed = 1;
         } else {
+          if ($a eq $A and $b eq $B and $c eq $C and $d eq $D) {
+            print "removing $a from section $s\n";
+          } else {
             print TMP "$_\n";
+          }
         }
     }
     if (!$printed) {
