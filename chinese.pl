@@ -261,21 +261,22 @@ sub grammar_lookup {
 
 sub list_sections {
     my $mode = shift;
-    my @sections;
+    my %sections = ();
 
     my $file = $mode eq 'grammar' ? $grammar : $wordlist;
     open FILE, "<$file";
     while (<FILE>) {
         chomp;
         my ($a, $b, $c, $d, $s) = split /\|/;
-        push @sections, $s unless grep {$_ eq $s} @sections;
+        ++$sections{$s};
     }
     close FILE;
 
-    my @sorted = sort {lc $a cmp lc $b} @sections;
-
-    for (my $i=1; $i <= $#sorted + 1; ++$i) {
-        print "$i. ", $sorted[$i-1], "\n";
+    my $c = 1;
+    printf "%-3s [%-3s] %s\n", 'SECTION', 'WORDS', 'NAME';
+    foreach my $key (sort {lc $a cmp lc $b} keys %sections) {
+        printf "%-3s [%3s] %s\n",  "$c.", $sections{$key}, $key;
+	++$c;
     }
 }
 
