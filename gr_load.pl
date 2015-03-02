@@ -67,6 +67,10 @@ for (;;) {
             push @trad, ' ';
             push @piny_c, ' ';
             next;
+        } elsif ($chars[$c] eq '/') {
+            push @trad, '/';
+            push @piny_c, '/';
+            next;
         }
         my $j=0;
         if ($c+3 <= $#chars) { 
