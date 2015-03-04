@@ -87,7 +87,6 @@ for (;;) {
     } else {
         $line = "$simplified|$traditional|$pinyin|$english";
     }
-
     insert_line($line, $section);
 
     undef $english;
@@ -142,6 +141,7 @@ sub get_section {
 
 sub insert_line {
     my ($line, $section) = @_;
+    print "Adding $line to section $section\n";
     my ($A, $B, $C, $D, $S) = split /\|/, $line;
     my $flag = 0;
     my $printed = 0;
