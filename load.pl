@@ -15,6 +15,7 @@ my $found_strokes = 0;
 my $found_pinyin = 0;
 
 my $wordlist = 'chinese';
+my $characters = 'characters';
 my $lastsect = '.last_section';
 
 my $section = get_section($lastsect);
@@ -88,6 +89,11 @@ for (;;) {
         $line = "$simplified|$traditional|$pinyin|$english";
     }
     insert_line($line, $section);
+
+    my $first_engl_meaning = $english;
+    $first_engl_meaning =~ s/,.*$//;
+    my $char_string = "$simplified, $pinyin, $first_engl_meaning";
+    insert_char_string($simplified, $char_string);
 
     undef $english;
     $found_traditional = 0;
@@ -182,6 +188,36 @@ sub insert_line {
     close TMP;
     close FILE;
     system("mv $wordlist.tmp $wordlist");
+}
+
+sub insert_char_string {
+    my ($simplified, $char_string) = @_;
+    my @chars = split '', $simplified;
+    foreach my $char (@chars) {
+        my $found = 0;
+        open FILE, "<:encoding(utf8)", $characters;
+        open TMP, ">:encoding(utf8)", "$characters.tmp";
+        while (<FILE>) {
+            chomp;
+	    my ($stroke, $character, $meaning) = split / /;
+            if (defined($character) and $char eq $character) {
+                if (/$char_string/) {
+                    print "Not adding char string $char_string to $characters at line $_\n";
+                    print TMP "$_\n";
+                } else {
+                    print "Adding char string $char_string to $characters at end of line $_\n";
+                    print TMP "$_; $char_string\n";
+                }
+		++$found;
+            } else {
+                print TMP "$_\n";
+            }
+        }
+	print "Did not find $char in $characters\n" if !$found;
+        close TMP;
+        close FILE;
+        system("mv $characters.tmp $characters");
+    }
 }
 
 sub list_sections {
