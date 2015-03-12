@@ -160,14 +160,14 @@ sub insert_line {
             $flag = 1;
         }
         if ($flag and $s eq $section) {
-          if ($a eq $A and $b eq $B and $c eq $C and $d eq $D) {
-            print "removing $a from section $s\n";
+          if ($a eq $A and $b eq $B and $c eq $C) {
+            print "Removing $a from section $s\n";
           } else {
             print TMP "$_\n";
           }
         } elsif ($flag and $s ne $section) {
-            if ($a eq $A and $b eq $B and $c eq $C and $d eq $D) {
-              print "moving $a already in section $s to end of section\n";
+            if ($a eq $A and $b eq $B and $c eq $C) {
+              print "Moving $a already in section $s to end of section\n";
             } else {
               print TMP "$line|$section\n";
               print TMP "$_\n";
@@ -175,8 +175,8 @@ sub insert_line {
             $flag = 0;
             $printed = 1;
         } else {
-          if ($a eq $A and $b eq $B and $c eq $C and $d eq $D) {
-            print "removing $a from section $s\n";
+          if ($a eq $A and $b eq $B and $c eq $C) {
+            print "Removing $a from section $s\n";
           } else {
             print TMP "$_\n";
           }
@@ -193,27 +193,31 @@ sub insert_line {
 sub insert_char_string {
     my ($simplified, $char_string) = @_;
     my @chars = split '', $simplified;
+    if ($#chars == 1) {
+        print "Not adding $char_string to $characters\n";
+	return;
+    }
     foreach my $char (@chars) {
         my $found = 0;
         open FILE, "<:encoding(utf8)", $characters;
         open TMP, ">:encoding(utf8)", "$characters.tmp";
         while (<FILE>) {
             chomp;
-	    my ($stroke, $character, $meaning) = split / /;
+            my ($stroke, $character, $meaning) = split / /;
             if (defined($character) and $char eq $character) {
                 if (/$char_string/) {
-                    print "Not adding char string $char_string to $characters at line $_\n";
+                    print "Not adding $char_string to $characters at line $_\n";
                     print TMP "$_\n";
                 } else {
-                    print "Adding char string $char_string to $characters at end of line $_\n";
+                    print "Adding $char_string to $characters at end of line $_\n";
                     print TMP "$_; $char_string\n";
                 }
-		++$found;
+                ++$found;
             } else {
                 print TMP "$_\n";
             }
         }
-	print "Did not find $char in $characters\n" if !$found;
+        print "Did not find $char in $characters\n" if !$found;
         close TMP;
         close FILE;
         system("mv $characters.tmp $characters");
