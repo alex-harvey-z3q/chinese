@@ -22,7 +22,7 @@ my $grammar_reg = 'grammar.reg';
 my $lessons = 'lessons';
 
 my $threshold = 5;
-my $skip = 20;
+my $skip = 80;
 
 # seed the randomiser.
 srand;
@@ -87,7 +87,7 @@ sub ask_questions {
         }
         my ($question_line, $answer_line);
         my $chars = $traditional ? "$simplified/$traditional" : $simplified;
-        my ($status, $hist_str) = check_register($simplified, $history_reg);
+        my ($status, $hist_str) = check_register_and_possibly_skip($simplified, $history_reg);
         my $coin_toss = int(rand(2));
 
         if ($mode{'selection'} eq 'chinese' or
@@ -161,7 +161,7 @@ sub check_answer {
     return $am_correct;
 }
 
-sub check_register {
+sub check_register_and_possibly_skip {
     my ($simplified, $register) = @_;
     my $status = 1;
     my $hist_str = '';
@@ -173,7 +173,7 @@ sub check_register {
             $hist_str = $_;
             if (/\+{$threshold}$/) {
                 my $random = int(rand(100)) + 1;
-                $status = 0 if $random > $skip;
+                $status = 0 if $random <= $skip;
             }
             last;
         }
@@ -490,14 +490,16 @@ Usage: $0
     --threshold|-T <threshold> - set number correct threshold (default 5 in a row)
       -T 100   - only consider skipping if this word is right 100 times in a row
       -T 1     - consider skipping if this word was right last time
-    --skip|-K <skip>           - set skip threshold (default 20% chance of skipping)
-      -K 100   - never skip a word
-      -K 0     - always skip, if threshold is met
+    --skip|-K <skip>   - percent chance of skipping (default 80% chance of skipping)
+      -K 100   - always skip, if threshold is met
+      -K 0     - never skip
 
 Useful combinations of -T/-K:
-    -T 1 -K 0  - only ask questions that were incorrect on the last try, and
-                 always otherwise skip
-    -K 100     - never skip a word (all -T options have the same effect here).
+    -T 1 -K 100 - only ask questions that were not correct on the last try, and
+                  always otherwise skip
+    -T 2 -K 100 - only ask questions that were not correct on the last two tries, and
+                  always otherwise skip
+    -K 0        - never skip a word (all -T options have the same effect here).
 
 Answers to Chinese questions must take the form of toneless Pinyin followed by
 a comma followed by the English, where case doesn't matter, e.g.
